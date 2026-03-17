@@ -108,16 +108,17 @@ export default function FaceLogin({ onSuccess }: FaceLoginProps) {
         
         const distance = faceapi.euclideanDistance(liveDescriptor, savedDescriptor);
         
-        if (distance < 0.5) {
+        // Loosened threshold for mobile camera variants
+        if (distance < 0.6) {
           handleSuccess();
           return;
         }
       }
 
-      if (Date.now() - startTime > 10000) {
-        setError("Face not recognized 😕");
+      if (Date.now() - startTime > 15000) {
+        setError("Having trouble recognizing you...");
       } else {
-        setTimeout(detectAndMatch, 800);
+        setTimeout(detectAndMatch, 600);
       }
 
     } catch (err) {
