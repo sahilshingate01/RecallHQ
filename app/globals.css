@@ -1,0 +1,110 @@
+@import url("https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800;900&family=DM+Sans:wght@300;400;500;600;700&display=swap");
+@import "tailwindcss";
+
+:root {
+  --bg-main: #dde3ed;
+  --bg-card: #e8ecf4;
+  --bg-sidebar: #e8ecf4;
+  --shadow-dark: rgba(163, 177, 198, 0.65);
+  --shadow-light: rgba(255, 255, 255, 0.95);
+  --accent-coral: #f15a2b;
+  --accent-coral-2: #ee5a24;
+  --accent-blue: #4facfe;
+  --accent-blue-2: #00c6ff;
+  --text-primary: #1e2a3a;
+  --text-secondary: #9aa5b4;
+  --text-muted: #b0bac8;
+  --success: #00b894;
+  --warning: #fab1a0;
+
+  /* Neumorphic shadows */
+  --shadow-raised: 8px 8px 18px rgba(163, 177, 198, 0.6),
+    -8px -8px 18px rgba(255, 255, 255, 0.95);
+  --shadow-raised-sm: 5px 5px 10px rgba(163, 177, 198, 0.55),
+    -5px -5px 10px rgba(255, 255, 255, 0.9);
+  --shadow-raised-lg: 12px 12px 24px rgba(163, 177, 198, 0.65),
+    -12px -12px 24px rgba(255, 255, 255, 0.95);
+  --shadow-inset: inset 4px 4px 9px rgba(163, 177, 198, 0.55),
+    inset -4px -4px 9px rgba(255, 255, 255, 0.85);
+  --shadow-inset-sm: inset 2px 2px 6px rgba(163, 177, 198, 0.45),
+    inset -2px -2px 6px rgba(255, 255, 255, 0.8);
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html,
+body {
+  height: 100%;
+  overflow: hidden;
+}
+
+body {
+  font-family: "DM Sans", sans-serif;
+  background: #dde3ed;
+  color: var(--text-primary);
+  -webkit-font-smoothing: antialiased;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+h1,
+h2,
+h3,
+h4,
+h5 {
+  font-family: "Nunito", sans-serif;
+}
+
+/* Skeuomorphic utility classes */
+.sku-raised {
+  box-shadow: var(--shadow-raised);
+}
+.sku-raised-sm {
+  box-shadow: var(--shadow-raised-sm);
+}
+.sku-raised-lg {
+  box-shadow: var(--shadow-raised-lg);
+}
+.sku-inset {
+  box-shadow: var(--shadow-inset);
+}
+.sku-inset-sm {
+  box-shadow: var(--shadow-inset-sm);
+}
+
+/* Scrollbar styling */
+::-webkit-scrollbar {
+  width: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(163, 177, 198, 0.5);
+  border-radius: 10px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(163, 177, 198, 0.8);
+}
+
+/* Inputs */
+input,
+textarea {
+  font-family: "DM Sans", sans-serif;
+  outline: none;
+  border: none;
+  background: var(--bg-card);
+}
+
+/* Selection */
+::selection {
+  background: rgba(241, 90, 43, 0.2);
+}
