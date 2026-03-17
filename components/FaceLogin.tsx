@@ -2,7 +2,8 @@
 
 import { useEffect, useRef, useState, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { CheckCircle2, AlertCircle, RefreshCw, Key } from "lucide-react";
+import { CheckCircle2, AlertCircle, RefreshCw, Key, ShieldCheck } from "lucide-react";
+import { settingsService } from "@/lib/settingsService";
 
 interface FaceLoginProps {
   onSuccess: () => void;
@@ -16,6 +17,9 @@ export default function FaceLogin({ onSuccess }: FaceLoginProps) {
   const [isSuccess, setIsSuccess] = useState(false);
   const [startTime, setStartTime] = useState(Date.now());
   const [isClosing, setIsClosing] = useState(false);
+  const [showPinInput, setShowPinInput] = useState(false);
+  const [pin, setPin] = useState("");
+  const [pinError, setPinError] = useState(false);
 
   const loadModels = async () => {
     try {
@@ -66,13 +70,13 @@ export default function FaceLogin({ onSuccess }: FaceLoginProps) {
   }, []);
 
   useEffect(() => {
-    if (modelsLoaded && !isSuccess) {
+    if (modelsLoaded && !isSuccess && !showPinInput) {
       startVideo();
     }
-  }, [modelsLoaded, isSuccess, startVideo]);
+  }, [modelsLoaded, isSuccess, startVideo, showPinInput]);
 
   const detectAndMatch = useCallback(async () => {
-    if (!videoRef.current || !modelsLoaded || isSuccess || error) return;
+    if (!videoRef.current || !modelsLoaded || isSuccess || error || showPinInput) return;
 
     try {
       const faceapi = await import("face-api.js");
@@ -82,9 +86,20 @@ export default function FaceLogin({ onSuccess }: FaceLoginProps) {
         .withFaceDescriptor();
 
       if (detection) {
-        const storedDescriptorRaw = localStorage.getItem('recallhq_face_descriptor');
+        let storedDescriptorRaw = localStorage.getItem('recallhq_face_descriptor');
+        
+        // If not found locally, try fetching from Supabase (for "any device" support)
         if (!storedDescriptorRaw) {
-          setError("No Face ID found. Please register first.");
+          const settings = await settingsService.getSettings();
+          if (settings && settings.face_descriptor) {
+            storedDescriptorRaw = JSON.stringify(settings.face_descriptor);
+            localStorage.setItem('recallhq_face_descriptor', storedDescriptorRaw);
+            localStorage.setItem('recallhq_face_registered', 'true');
+          }
+        }
+
+        if (!storedDescriptorRaw) {
+          setError("Face ID not registered on this device or cloud.");
           return;
         }
 
@@ -94,12 +109,7 @@ export default function FaceLogin({ onSuccess }: FaceLoginProps) {
         const distance = faceapi.euclideanDistance(liveDescriptor, savedDescriptor);
         
         if (distance < 0.5) {
-          setIsSuccess(true);
-          stopVideo();
-          setTimeout(() => {
-            setIsClosing(true);
-            setTimeout(() => onSuccess(), 800);
-          }, 1500);
+          handleSuccess();
           return;
         }
       }
@@ -113,19 +123,39 @@ export default function FaceLogin({ onSuccess }: FaceLoginProps) {
     } catch (err) {
       console.error("Detection error:", err);
     }
-  }, [modelsLoaded, isSuccess, startTime, onSuccess, error]);
+  }, [modelsLoaded, isSuccess, startTime, onSuccess, error, showPinInput]);
+
+  const handleSuccess = () => {
+    setIsSuccess(true);
+    stopVideo();
+    setTimeout(() => {
+      setIsClosing(true);
+      setTimeout(() => onSuccess(), 800);
+    }, 1500);
+  };
 
   useEffect(() => {
-    if (modelsLoaded && !isSuccess && !error) {
+    if (modelsLoaded && !isSuccess && !error && !showPinInput) {
       const timer = setTimeout(detectAndMatch, 1000);
       return () => clearTimeout(timer);
     }
-  }, [modelsLoaded, isSuccess, error, detectAndMatch]);
+  }, [modelsLoaded, isSuccess, error, detectAndMatch, showPinInput]);
 
   const handleRetry = () => {
     setError(null);
     setStartTime(Date.now());
     startVideo();
+  };
+
+  const handlePinSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (pin === "8421") {
+      handleSuccess();
+    } else {
+      setPinError(true);
+      setPin("");
+      setTimeout(() => setPinError(false), 500);
+    }
   };
 
   if (loading) {
@@ -185,16 +215,15 @@ export default function FaceLogin({ onSuccess }: FaceLoginProps) {
               Identify Verified
             </span>
             <h1 style={{ fontFamily: "Nunito", fontWeight: 900, fontSize: 42, color: "#1e2a3a", margin: 0, lineHeight: 1 }}>
-              Face Unlock
+              {showPinInput ? "PIN Unlock" : "Face Unlock"}
             </h1>
             <p style={{ fontFamily: "DM Sans", color: "#9aa5b4", fontSize: 16, marginTop: 8 }}>
-              Look at the camera to unlock
+              {showPinInput ? "Enter your 4-digit security code" : "Look at the camera to unlock"}
             </p>
           </div>
 
-          {/* Main Camera Circle Section */}
+          {/* Main Area */}
           <div style={{ position: "relative", marginTop: 40 }}>
-            {/* Outer Neumorphic Card */}
             <div 
               style={{
                 width: 340,
@@ -208,7 +237,6 @@ export default function FaceLogin({ onSuccess }: FaceLoginProps) {
                 padding: 18,
               }}
             >
-              {/* Camera Container */}
               <div 
                 style={{
                   width: "100%",
@@ -221,38 +249,65 @@ export default function FaceLogin({ onSuccess }: FaceLoginProps) {
                 }}
               >
                 {!isSuccess ? (
-                  <>
-                    <video
-                      ref={videoRef}
-                      autoPlay
-                      muted
-                      playsInline
-                      style={{
-                        position: "absolute",
-                        inset: 0,
-                        width: "100%",
-                        height: "100%",
-                        objectFit: "cover",
-                        transform: "scaleX(-1)",
-                      }}
-                    />
-                    
-                    {/* Horizontal Scan Line */}
-                    {!error && (
-                      <motion.div
-                        animate={{ translateY: [-170, 170] }}
-                        transition={{ duration: 2.5, repeat: Infinity, repeatType: "mirror", ease: "easeInOut" }}
+                  showPinInput ? (
+                    <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center", padding: 40 }}>
+                      <form onSubmit={handlePinSubmit} style={{ width: "100%", display: "flex", flexDirection: "column", alignItems: "center", gap: 20 }}>
+                        <motion.input
+                          animate={pinError ? { x: [-10, 10, -10, 10, 0] } : {}}
+                          type="password"
+                          maxLength={4}
+                          value={pin}
+                          onChange={(e) => setPin(e.target.value.replace(/\D/g, ""))}
+                          placeholder="••••"
+                          autoFocus
+                          style={{
+                            width: "100%",
+                            background: "transparent",
+                            border: "none",
+                            fontSize: 48,
+                            textAlign: "center",
+                            color: "#1e2a3a",
+                            fontFamily: "Nunito",
+                            letterSpacing: "0.2em",
+                            outline: "none"
+                          }}
+                        />
+                        <button type="submit" style={{ display: "none" }}>Unlock</button>
+                        <ShieldCheck size={48} color={pinError ? "#f15a2b" : "#9aa5b4"} opacity={0.3} />
+                      </form>
+                    </div>
+                  ) : (
+                    <>
+                      <video
+                        ref={videoRef}
+                        autoPlay
+                        muted
+                        playsInline
                         style={{
                           position: "absolute",
+                          inset: 0,
                           width: "100%",
-                          height: 3,
-                          zIndex: 20,
-                          background: "linear-gradient(to right, transparent, rgba(79, 172, 254, 0.8), transparent)",
-                          boxShadow: "0 0 15px rgba(79, 172, 254, 0.5)",
+                          height: "100%",
+                          objectFit: "cover",
+                          transform: "scaleX(-1)",
                         }}
                       />
-                    )}
-                  </>
+                      {!error && (
+                        <motion.div
+                          animate={{ translateY: [-170, 170] }}
+                          transition={{ duration: 2.5, repeat: Infinity, repeatType: "mirror", ease: "easeInOut" }}
+                          style={{
+                            position: "absolute",
+                            width: "100%",
+                            height: 3,
+                            zIndex: 20,
+                            background: "linear-gradient(to right, transparent, rgba(79, 172, 254, 0.8), transparent)",
+                            boxShadow: "0 0 15px rgba(79, 172, 254, 0.5)",
+                          }}
+                        />
+                      )}
+                    </>
+                  )
                 ) : (
                   <motion.div
                     initial={{ scale: 0.8, opacity: 0 }}
@@ -273,8 +328,7 @@ export default function FaceLogin({ onSuccess }: FaceLoginProps) {
               </div>
             </div>
 
-            {/* Scanning Ring */}
-            {!isSuccess && !error && (
+            {!isSuccess && !error && !showPinInput && (
                <motion.div 
                 animate={{ rotate: 360 }}
                 transition={{ repeat: Infinity, duration: 4, ease: "linear" }}
@@ -290,73 +344,22 @@ export default function FaceLogin({ onSuccess }: FaceLoginProps) {
             )}
           </div>
 
-          {/* Status Indicators */}
+          {/* Status/Actions */}
           <div style={{ marginTop: 48, display: "flex", flexDirection: "column", alignItems: "center" }}>
             {isSuccess ? (
               <motion.span 
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
-                style={{
-                  color: "#00b894",
-                  fontWeight: 900,
-                  fontSize: 22,
-                  fontFamily: "Nunito",
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 12
-                }}
+                style={{ color: "#00b894", fontWeight: 900, fontSize: 22, fontFamily: "Nunito" }}
               >
-                Identification Verified ✓
+                Access Granted ✓
               </motion.span>
-            ) : error ? (
-              <motion.div 
-                initial={{ x: -10 }}
-                animate={{ x: [0, -10, 10, -8, 8, 0] }}
-                transition={{ duration: 0.5 }}
-                style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 32 }}
-              >
-                <div 
-                  style={{
-                    padding: "12px 24px",
-                    borderRadius: 20,
-                    background: "rgba(241, 90, 43, 0.08)",
-                    border: "none",
-                    boxShadow: "inset 2px 2px 5px rgba(241, 90, 43, 0.1)",
-                    color: "#f15a2b",
-                    fontWeight: 800,
-                    fontSize: 17,
-                    fontFamily: "Nunito"
-                  }}
-                >
-                  {error}
-                </div>
-                <div style={{ display: "flex", gap: 16 }}>
-                  <motion.button
-                    whileHover={{ scale: 1.05, y: -2 }}
+            ) : showPinInput ? (
+              <div style={{ display: "flex", gap: 16 }}>
+                 <motion.button
+                    whileHover={{ scale: 1.05 }}
                     whileTap={{ scale: 0.95 }}
-                    onClick={handleRetry}
-                    style={{
-                      padding: "16px 36px",
-                      background: "linear-gradient(135deg, #4facfe, #00c6ff)",
-                      color: "white",
-                      borderRadius: 50,
-                      border: "none",
-                      fontWeight: 900,
-                      fontFamily: "Nunito",
-                      fontSize: 16,
-                      boxShadow: "5px 5px 15px rgba(79, 172, 254, 0.4), -2px -2px 8px rgba(255,255,255,0.6)",
-                      cursor: "pointer",
-                      display: "flex",
-                      alignItems: "center",
-                      gap: 10
-                    }}
-                  >
-                    <RefreshCw size={20} strokeWidth={2.5} />
-                    Try Again
-                  </motion.button>
-                  <motion.button
-                    whileHover={{ scale: 1.05, y: -2 }}
-                    whileTap={{ scale: 0.95 }}
+                    onClick={() => { setShowPinInput(false); setPin(""); }}
                     style={{
                       padding: "16px 36px",
                       background: "#e8ecf4",
@@ -368,48 +371,54 @@ export default function FaceLogin({ onSuccess }: FaceLoginProps) {
                       fontSize: 16,
                       boxShadow: "5px 5px 15px rgba(163,177,198,0.5), -5px -5px 15px rgba(255,255,255,0.9)",
                       cursor: "pointer",
-                      display: "flex",
-                      alignItems: "center",
-                      gap: 10
                     }}
                   >
-                    <Key size={18} strokeWidth={2.5} />
-                    Enter PIN
+                    Use Face ID
+                  </motion.button>
+              </div>
+            ) : error ? (
+              <motion.div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 32 }}>
+                <div style={{ padding: "12px 24px", borderRadius: 20, background: "rgba(241, 90, 43, 0.08)", color: "#f15a2b", fontWeight: 800 }}>
+                  {error}
+                </div>
+                <div style={{ display: "flex", gap: 16 }}>
+                  <motion.button
+                    whileHover={{ scale: 1.05 }}
+                    whileTap={{ scale: 0.95 }}
+                    onClick={handleRetry}
+                    style={{ padding: "16px 36px", background: "linear-gradient(135deg, #4facfe, #00c6ff)", color: "white", borderRadius: 50, border: "none", fontWeight: 900, cursor: "pointer", display: "flex", alignItems: "center", gap: 10 }}>
+                    <RefreshCw size={20} strokeWidth={2.5} /> Retry
+                  </motion.button>
+                  <motion.button
+                    whileHover={{ scale: 1.05 }}
+                    whileTap={{ scale: 0.95 }}
+                    onClick={() => { setShowPinInput(true); stopVideo(); }}
+                    style={{ padding: "16px 36px", background: "#e8ecf4", color: "#9aa5b4", borderRadius: 50, border: "none", fontWeight: 900, cursor: "pointer", display: "flex", alignItems: "center", gap: 10 }}>
+                    <Key size={18} strokeWidth={2.5} /> Enter PIN
                   </motion.button>
                 </div>
               </motion.div>
             ) : (
-              <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
-                <span style={{ color: "#f15a2b", fontWeight: 900, fontSize: 18, fontFamily: "Nunito", letterSpacing: "0.05em" }}>
-                  IDENTIFYING...
-                </span>
-                <div style={{ display: "flex", gap: 8 }}>
-                  {[0, 0.2, 0.4].map((delay, i) => (
-                    <motion.div
-                      key={i}
-                      animate={{ translateY: [0, -8, 0] }}
-                      transition={{ duration: 0.6, repeat: Infinity, delay }}
-                      style={{
-                        width: 9,
-                        height: 9,
-                        borderRadius: "50%",
-                        background: "#f15a2b",
-                        boxShadow: "0 0 10px rgba(241, 90, 43, 0.4)"
-                      }}
-                    />
-                  ))}
+              <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 24 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
+                  <span style={{ color: "#f15a2b", fontWeight: 900, fontSize: 18, fontFamily: "Nunito" }}>IDENTIFYING...</span>
                 </div>
+                <motion.button
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
+                  onClick={() => { setShowPinInput(true); stopVideo(); }}
+                  style={{ background: "transparent", border: "none", color: "#9aa5b4", fontWeight: 700, cursor: "pointer", display: "flex", alignItems: "center", gap: 8 }}>
+                  <Key size={16} /> Use PIN instead
+                </motion.button>
               </div>
             )}
           </div>
 
-          {/* Bottom Branding */}
           <div style={{ position: "absolute", bottom: 48 }}>
             <p style={{ color: "rgba(30, 42, 58, 0.3)", fontWeight: 800, fontSize: 13, letterSpacing: "0.2em", textTransform: "uppercase", fontFamily: "Nunito" }}>
               RecallHQ Secured 🔐
             </p>
           </div>
-
         </motion.div>
       )}
     </AnimatePresence>

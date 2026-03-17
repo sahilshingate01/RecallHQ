@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { CheckCircle2, AlertCircle, Camera } from "lucide-react";
+import { settingsService } from "@/lib/settingsService";
 
 interface FaceRegisterProps {
   onComplete: () => void;
@@ -89,8 +90,13 @@ export default function FaceRegister({ onComplete }: FaceRegisterProps) {
       }
 
       const descriptorArray = Array.from(detections.descriptor);
+      
+      // Save locally
       localStorage.setItem('recallhq_face_descriptor', JSON.stringify(descriptorArray));
       localStorage.setItem('recallhq_face_registered', 'true');
+      
+      // Sync to Database
+      await settingsService.saveFaceDescriptor(descriptorArray);
       
       setIsRegistered(true);
       stopVideo();

@@ -7,6 +7,8 @@ import FaceLogin from "@/components/FaceLogin";
 import FaceRegister from "@/components/FaceRegister";
 import AddTaskModal from "@/components/AddTaskModal";
 
+import { settingsService } from "@/lib/settingsService";
+
 export default function DashboardLayout({
   children,
 }: {
@@ -19,10 +21,34 @@ export default function DashboardLayout({
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
 
   useEffect(() => {
-    const registered = localStorage.getItem("recallhq_face_registered") === "true";
-    setIsRegistered(registered);
-    setLoading(false);
+    const checkRegistration = async () => {
+      // Check local storage first
+      const localRegistered = localStorage.getItem("recallhq_face_registered") === "true";
+      
+      if (localRegistered) {
+        setIsRegistered(true);
+        setLoading(false);
+        return;
+      }
+
+      // If not local, check database (for "any device" support)
+      try {
+        const settings = await settingsService.getSettings();
+        if (settings && settings.face_descriptor) {
+          localStorage.setItem("recallhq_face_registered", "true");
+          localStorage.setItem("recallhq_face_descriptor", JSON.stringify(settings.face_descriptor));
+          setIsRegistered(true);
+        }
+      } catch (err) {
+        console.error("Error checking registration stats:", err);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    checkRegistration();
   }, []);
+
 
   if (loading) {
     return (
