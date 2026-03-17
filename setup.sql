@@ -123,3 +123,22 @@ CREATE POLICY "Allow all access to reminders" ON public.reminders FOR ALL USING 
 CREATE INDEX idx_reminders_user_id ON public.reminders(user_id);
 CREATE INDEX idx_reminders_remind_at ON public.reminders(remind_at ASC);
 
+-- ==========================================
+-- 6. CARDS TABLE
+-- ==========================================
+DROP TABLE IF EXISTS public.cards CASCADE;
+CREATE TABLE public.cards (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id UUID NOT NULL,
+    title TEXT NOT NULL,
+    link TEXT NOT NULL,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+ALTER TABLE public.cards ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Allow all access to cards" ON public.cards;
+CREATE POLICY "Allow all access to cards" ON public.cards FOR ALL USING (true) WITH CHECK (true);
+CREATE INDEX idx_cards_user_id ON public.cards(user_id);
+CREATE INDEX idx_cards_created_at ON public.cards(created_at DESC);
+

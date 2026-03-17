@@ -7,6 +7,7 @@ import {
   CheckSquare,
   Bell,
   FileText,
+  CreditCard,
 } from "lucide-react";
 
 const navItems = [
@@ -14,6 +15,7 @@ const navItems = [
   { id: "tasks",     label: "Tasks",     icon: CheckSquare,     path: "/tasks"     },
   { id: "reminders", label: "Reminders", icon: Bell,            path: "/reminders" },
   { id: "notes",     label: "Notes",     icon: FileText,        path: "/notes"     },
+  { id: "cards",     label: "Cards",     icon: CreditCard,      path: "/cards"     },
 ];
 
 export default function Sidebar() {
