@@ -4,14 +4,22 @@ const FIXED_USER_ID = '00000000-0000-0000-0000-000000000001'
 
 export const settingsService = {
   async getSettings() {
-    const { data, error } = await supabase
-      .from('settings')
-      .select('*')
-      .eq('user_id', FIXED_USER_ID)
-      .single()
-    
-    if (error && error.code !== 'PGRST116') throw error // PGRST116 is "no rows returned"
-    return data
+    try {
+      const { data, error } = await supabase
+        .from('settings')
+        .select('*')
+        .eq('user_id', FIXED_USER_ID)
+        .maybeSingle()
+      
+      if (error) {
+        console.warn('Supabase settings error:', error.message)
+        return null
+      }
+      return data
+    } catch (e) {
+      console.error('Failed to fetch settings:', e)
+      return null
+    }
   },
 
   async saveFaceDescriptor(descriptor: number[]) {
