@@ -1,10 +1,18 @@
 const express = require('express');
 const cors = require('cors');
 const { createClient } = require('@supabase/supabase-js');
+const cron = require('node-cron');
+const { sendDailyReport } = require('./services/reportService');
 require('dotenv').config();
 
 const app = express();
 const port = process.env.PORT || 5000;
+
+// Schedule daily report at midnight (00:00)
+cron.schedule('0 0 * * *', () => {
+  console.log('Running daily report job at midnight...');
+  sendDailyReport();
+});
 
 app.use(cors());
 app.use(express.json());
@@ -119,6 +127,16 @@ app.get('/api/reminders', async (req, res) => {
     
     if (error) throw error;
     res.json(data);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Test Daily Report
+app.post('/api/test-report', async (req, res) => {
+  try {
+    await sendDailyReport();
+    res.json({ message: 'Report sent successfully' });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
