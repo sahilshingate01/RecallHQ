@@ -334,7 +334,7 @@ export default function TaskCard({ task }: TaskCardProps) {
               <motion.button
                 onClick={(e) => { e.stopPropagation(); toggleComplete(task.id, !task.completed); }}
                 whileTap={{ scale: 0.88 }}
-                title={isDoneToday ? "Mark as not done for today" : "Mark as done for today"}
+                title={isDoneToday ? "Mark as not done for today (move back to active)" : "Mark as done for today"}
                 style={{
                   display: "flex",
                   alignItems: "center",
@@ -365,7 +365,7 @@ export default function TaskCard({ task }: TaskCardProps) {
                       exit={{ scale: 0 }}
                       style={{ display: "flex", alignItems: "center" }}
                     >
-                      <Check size={13} strokeWidth={3} />
+                      <RotateCcw size={13} strokeWidth={3} />
                     </motion.div>
                   ) : (
                     <motion.div
@@ -375,27 +375,33 @@ export default function TaskCard({ task }: TaskCardProps) {
                       exit={{ scale: 0 }}
                       style={{ display: "flex", alignItems: "center" }}
                     >
-                      <RotateCcw size={13} strokeWidth={2.5} />
+                      <Check size={13} strokeWidth={2.5} />
                     </motion.div>
                   )}
                 </AnimatePresence>
-                {isDoneToday ? "Done Today" : "Mark Done"}
+                {isDoneToday ? "Restore" : "Mark Done"}
               </motion.button>
             ) : (
-              /* --- ONE-TIME TASK: round toggle --- */
+              /* --- ONE-TIME TASK: Restore/Toggle --- */
               <motion.button
                 onClick={(e) => { e.stopPropagation(); toggleComplete(task.id, !task.completed); }}
                 whileTap={{ scale: 0.88 }}
-                title={task.completed ? "Mark as incomplete" : "Mark as complete"}
+                title={task.completed ? "Mark as incomplete (move back to active)" : "Mark as complete"}
                 style={{
-                  width: 38,
+                  gap: task.completed ? 7 : 0,
+                  padding: task.completed ? "8px 16px" : "0",
+                  width: task.completed ? "auto" : 38,
                   height: 38,
-                  borderRadius: "50%",
+                  borderRadius: task.completed ? 50 : "50%",
                   border: "none",
                   cursor: "pointer",
+                  fontFamily: "Nunito, sans-serif",
+                  fontWeight: 800,
+                  fontSize: 12.5,
                   background: task.completed
                     ? "linear-gradient(135deg, #f15a2b, #ee5a24)"
                     : "#e8ecf4",
+                  color: task.completed ? "white" : "#9aa5b4",
                   boxShadow: task.completed
                     ? "inset 3px 3px 6px rgba(0,0,0,0.2)"
                     : "4px 4px 10px rgba(163,177,198,0.6), -4px -4px 10px rgba(255,255,255,0.9)",
@@ -408,13 +414,14 @@ export default function TaskCard({ task }: TaskCardProps) {
                 <AnimatePresence mode="wait">
                   {task.completed ? (
                     <motion.div
-                      key="check"
+                      key="restore"
                       initial={{ scale: 0, rotate: -30 }}
                       animate={{ scale: 1, rotate: 0 }}
                       exit={{ scale: 0 }}
                       transition={{ type: "spring", stiffness: 600, damping: 20 }}
+                      style={{ display: "flex", alignItems: "center" }}
                     >
-                      <Check size={18} color="white" strokeWidth={3.5} />
+                      <RotateCcw size={14} color="white" strokeWidth={3.5} />
                     </motion.div>
                   ) : (
                     <motion.div
@@ -423,10 +430,11 @@ export default function TaskCard({ task }: TaskCardProps) {
                       animate={{ scale: 1 }}
                       exit={{ scale: 0 }}
                     >
-                      <Minus size={16} color="#9aa5b4" strokeWidth={2.5} />
+                      <Check size={18} color="#9aa5b4" strokeWidth={2.5} />
                     </motion.div>
                   )}
                 </AnimatePresence>
+                {task.completed && "Restore"}
               </motion.button>
             )}
           </div>

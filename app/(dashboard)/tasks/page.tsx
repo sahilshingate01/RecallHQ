@@ -102,6 +102,22 @@ export default function TasksPage() {
     fetchTasks();
   }, [fetchTasks]);
 
+  const todayStr = new Date().toISOString().split("T")[0];
+  
+  const pendingTasks = tasks.filter((t) => {
+    if (t.type === "daily") {
+      return !(t.completed && t.completed_at && t.completed_at.startsWith(todayStr));
+    }
+    return !t.completed;
+  });
+
+  const completedTasks = tasks.filter((t) => {
+    if (t.type === "daily") {
+      return t.completed && t.completed_at && t.completed_at.startsWith(todayStr);
+    }
+    return t.completed;
+  });
+
   return (
     <div style={{ height: "100%", display: "flex", flexDirection: "column", overflow: "hidden" }}>
 
@@ -126,7 +142,7 @@ export default function TasksPage() {
         />
         <StatCard
           delay={0.2}
-          label="Completed"
+          label="Completed Today"
           value={getCompletedToday()}
           icon={CheckCircle2}
           iconBg="linear-gradient(135deg, #fd79a8, #e17055)"
@@ -146,7 +162,7 @@ export default function TasksPage() {
       </div>
 
       {/* ── Task list ── */}
-      <div style={{ flex: 1, overflowY: "auto" }}>
+      <div style={{ flex: 1, overflowY: "auto", paddingRight: 4 }}>
         {loading ? (
           <div
             style={{
@@ -182,19 +198,81 @@ export default function TasksPage() {
         ) : tasks.length === 0 ? (
           <EmptyState />
         ) : (
-          <div
-            style={{
-              display: "grid",
-              gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))",
-              gap: 20,
-              paddingBottom: 32,
-            }}
-          >
-            <AnimatePresence mode="popLayout">
-              {tasks.map((task) => (
-                <TaskCard key={task.id} task={task} />
-              ))}
-            </AnimatePresence>
+          <div style={{ display: "flex", flexDirection: "column", gap: 40, paddingBottom: 40 }}>
+            
+            {/* Active Tasks Section */}
+            {pendingTasks.length > 0 && (
+              <div>
+                <motion.h2
+                  initial={{ opacity: 0, x: -10 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  style={{
+                    fontFamily: "Nunito, sans-serif",
+                    fontSize: 18,
+                    fontWeight: 800,
+                    color: "#57606f",
+                    marginBottom: 20,
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 10,
+                  }}
+                >
+                  Active Tasks
+                  <span style={{ fontSize: 13, color: "#9aa5b4", fontWeight: 600 }}>({pendingTasks.length})</span>
+                </motion.h2>
+                <div
+                  style={{
+                    display: "grid",
+                    gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))",
+                    gap: 20,
+                  }}
+                >
+                  <AnimatePresence mode="popLayout">
+                    {pendingTasks.map((task) => (
+                      <TaskCard key={task.id} task={task} />
+                    ))}
+                  </AnimatePresence>
+                </div>
+              </div>
+            )}
+
+            {/* Completed Section */}
+            {completedTasks.length > 0 && (
+              <div style={{ opacity: 0.85 }}>
+                <motion.h2
+                  initial={{ opacity: 0, x: -10 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  style={{
+                    fontFamily: "Nunito, sans-serif",
+                    fontSize: 18,
+                    fontWeight: 800,
+                    color: "#57606f",
+                    marginBottom: 20,
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 10,
+                  }}
+                >
+                  Completed Today
+                  <span style={{ fontSize: 13, color: "#9aa5b4", fontWeight: 600 }}>({completedTasks.length})</span>
+                </motion.h2>
+                <div
+                  style={{
+                    display: "grid",
+                    gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))",
+                    gap: 20,
+                  }}
+                >
+                  <AnimatePresence mode="popLayout">
+                    {completedTasks.map((task) => (
+                      <TaskCard key={task.id} task={task} />
+                    ))}
+                  </AnimatePresence>
+                </div>
+              </div>
+            )}
+
+            {pendingTasks.length === 0 && completedTasks.length === 0 && <EmptyState />}
           </div>
         )}
       </div>
