@@ -63,7 +63,7 @@ export default function DSAPage() {
   const [bookmarked, setBookmarked] = useState<Record<string, boolean>>({});
   
   // Collapse state for Steps and Lectures
-  const [openSteps, setOpenSteps] = useState<Record<string, boolean>>({ "0": true });
+  const [openSteps, setOpenSteps] = useState<Record<string, boolean>>({});
   const [openLectures, setOpenLectures] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
