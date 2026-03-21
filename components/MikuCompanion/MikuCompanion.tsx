@@ -812,7 +812,7 @@ export default function MikuCompanion() {
               fontWeight: 700, color: 'white', letterSpacing: '0.3px',
             }}>Miku ♡</div>
 
-            <p style={{
+            <div style={{
               margin: 0, 
               fontSize: '13px', 
               lineHeight: 1.5, 
@@ -850,7 +850,7 @@ export default function MikuCompanion() {
                   )}
                 </>
               )}
-            </p>
+            </div>
 
             {/* Tail (Moved outside the restricted p to prevent clipping) */}
             <div style={{
