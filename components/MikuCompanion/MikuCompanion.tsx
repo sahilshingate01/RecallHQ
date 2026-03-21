@@ -7,12 +7,10 @@ import React, {
   useCallback,
 } from "react";
 import Image from "next/image";
-import { generateMikuMessage } from "@/lib/mikuEngine";
+import { generateMikuMessage, getMikuReply, getMikuClosingMessage } from "@/lib/mikuEngine";
 
 /* ─────────────────────────────────────────────
    IMAGE RESOLUTION
-   Falls back to available images until
-   miku-walking-1.png / miku-sitting.png exist
 ───────────────────────────────────────────── */
 const IMG_MAP: Record<string, string> = {
   "miku-walking-1": "miku-happy",
@@ -45,13 +43,19 @@ interface SittingCardInfo {
   y: number;
 }
 
+interface ConversationMsg {
+  role: 'miku' | 'user';
+  text: string;
+  emotion?: Emotion;
+}
+
 /* ─────────────────────────────────────────────
    CONSTANTS
 ───────────────────────────────────────────── */
 const SPEED    = 0.9;
 const MIKU_W   = 110;
 const MIKU_H   = 140;
-const FLOOR_Y  = 10;  // px from bottom when walking
+const FLOOR_Y  = 10;
 
 const START_SCENARIOS = [
   "walk_left_to_right",
@@ -61,199 +65,23 @@ const START_SCENARIOS = [
 ] as const;
 
 /* ─────────────────────────────────────────────
-   ADAPTER — wraps generateMikuMessage
+   TYPEWRITER COMPONENT
 ───────────────────────────────────────────── */
-async function fetchMikuMsg(
-  type: string,
-  taskName?: string
-): Promise<MikuMsg> {
-  try {
-    const result = await generateMikuMessage(type, taskName);
-    return {
-      emotion: result.emotion as Emotion,
-      text:    result.message,
-    };
-  } catch {
-    return { emotion: "thinking", text: "Ek second... kuch sochna pad raha hai 🤔" };
-  }
-}
-
-/* ─────────────────────────────────────────────
-   SPEECH BUBBLE
-───────────────────────────────────────────── */
-function MikuSpeechBubble({
-  msg, emotion, onDismiss,
-}: {
-  msg: MikuMsg | null;
-  emotion: Emotion;
-  onDismiss: () => void;
-}) {
+function TypewriterText({ text, speed = 25, onDone }: { text: string; speed?: number; onDone?: () => void }) {
   const [typed, setTyped] = useState("");
-  const [done,  setDone]  = useState(false);
-  const ivRef = useRef<ReturnType<typeof setInterval> | null>(null);
-
   useEffect(() => {
-    if (!msg) { setTyped(""); setDone(false); return; }
-    setTyped(""); setDone(false);
     let i = 0;
-    if (ivRef.current) clearInterval(ivRef.current);
-    ivRef.current = setInterval(() => {
-      i++;
-      setTyped(msg.text.slice(0, i));
-      if (i >= msg.text.length) { clearInterval(ivRef.current!); setDone(true); }
-    }, 25);
-    return () => { if (ivRef.current) clearInterval(ivRef.current); };
-  }, [msg]);
-
-  if (!msg) return null;
-
-  const safeEmotion = emotion === "walking-1" ? "happy" : emotion;
-
-  return (
-    <>
-      <style>{`
-        @keyframes bubbleIn {
-          0%  { transform: translateY(15px) scale(0.9); opacity:0; }
-          70% { transform: translateY(-3px) scale(1.02); }
-          100%{ transform: translateY(0) scale(1); opacity:1; }
-        }
-        @keyframes cursorBlink { 0%,100%{opacity:1} 50%{opacity:0} }
-      `}</style>
-      <div style={{
-        position:"absolute", bottom: MIKU_H + 24, left:"50%",
-        transform:"translateX(-50%)",
-        background:"white", border:"2px solid #F9A8D4",
-        borderRadius:"18px 18px 18px 4px", padding:"12px 16px",
-        maxWidth:270, minWidth:200, width:"max-content",
-        boxShadow:"0 8px 24px rgba(236,72,153,0.15)",
-        zIndex:99999,
-        animation:"bubbleIn 0.4s cubic-bezier(0.34,1.56,0.64,1) forwards",
-        pointerEvents:"auto",
-      }}>
-        {/* Header */}
-        <div style={{ display:"flex", alignItems:"center", gap:8, marginBottom:8 }}>
-          <div style={{ width:20, height:20, borderRadius:"50%", overflow:"hidden", flexShrink:0, position:"relative" }}>
-            <Image src={`/miku_images/miku-${safeEmotion}.png`} alt="Miku" fill style={{ objectFit:"cover" }} />
-          </div>
-          <span style={{ fontWeight:700, fontSize:12, color:"#7C3AED", fontFamily:"'Inter',sans-serif" }}>
-            Miku 💕
-          </span>
-          <button onClick={onDismiss} style={{
-            marginLeft:"auto", background:"none", border:"none",
-            cursor:"pointer", color:"#9CA3AF", fontSize:13, lineHeight:1, padding:"0 2px",
-          }}>✕</button>
-        </div>
-
-        {/* Text */}
-        <p style={{
-          margin:0, fontSize:13, lineHeight:1.6, color:"#374151",
-          fontFamily:"'Inter',sans-serif", whiteSpace:"pre-wrap", minHeight:36,
-        }}>
-          {typed}
-          {!done && (
-            <span style={{
-              display:"inline-block", width:2, height:13,
-              background:"#EC4899", marginLeft:2,
-              animation:"cursorBlink 0.6s ease infinite", verticalAlign:"middle",
-            }}/>
-          )}
-        </p>
-
-        {/* Buttons */}
-        {done && (
-          <div style={{ display:"flex", gap:8, marginTop:10, flexWrap:"wrap" }}>
-            <button onClick={onDismiss} style={{
-              background:"linear-gradient(135deg,#F9A8D4,#C084FC)",
-              border:"none", borderRadius:20, padding:"5px 14px",
-              fontSize:11.5, color:"white", cursor:"pointer",
-              fontWeight:700, fontFamily:"'Inter',sans-serif", whiteSpace:"nowrap",
-            }}>😂 Haha okay</button>
-            <button onClick={onDismiss} style={{
-              background:"none", border:"2px solid #F9A8D4",
-              borderRadius:20, padding:"4px 14px",
-              fontSize:11.5, color:"#EC4899", cursor:"pointer",
-              fontWeight:700, fontFamily:"'Inter',sans-serif", whiteSpace:"nowrap",
-            }}>😤 Fine fine</button>
-          </div>
-        )}
-
-        {/* Pointer triangle */}
-        <div style={{
-          position:"absolute", bottom:-11, left:22, width:0, height:0,
-          borderLeft:"10px solid transparent", borderRight:"4px solid transparent",
-          borderTop:"11px solid white", filter:"drop-shadow(0 1px 0 #F9A8D4)",
-        }}/>
-      </div>
-    </>
-  );
-}
-
-/* ─────────────────────────────────────────────
-   DUST PUFFS
-───────────────────────────────────────────── */
-function DustPuffs({ active }: { active: boolean }) {
-  const [key, setKey] = useState(0);
-  useEffect(() => {
-    if (!active) return;
-    const iv = setInterval(() => setKey(k => k+1), 400);
-    return () => clearInterval(iv);
-  }, [active]);
-
-  if (!active) return null;
-  return (
-    <>
-      <style>{`@keyframes dustPuff{0%{transform:scale(.2);opacity:.5}100%{transform:scale(1.8);opacity:0}}`}</style>
-      <div key={key} style={{ position:"absolute", bottom:0, left:"50%", transform:"translateX(-50%)", pointerEvents:"none" }}>
-        {[0, 150].map(delay => (
-          <div key={delay} style={{
-            position:"absolute", bottom:4,
-            left: delay === 0 ? -14 : 6,
-            width:8, height:8, borderRadius:"50%",
-            background:"rgba(150,150,150,0.55)",
-            animation:"dustPuff 0.4s ease-out forwards",
-            animationDelay:`${delay}ms`,
-          }}/>
-        ))}
-      </div>
-    </>
-  );
-}
-
-/* ─────────────────────────────────────────────
-   FLOATING HEARTS
-───────────────────────────────────────────── */
-function FloatingHearts({ active }: { active: boolean }) {
-  const [visible, setVisible] = useState(false);
-  const [key, setKey] = useState(0);
-  useEffect(() => {
-    if (!active) return;
     const iv = setInterval(() => {
-      setVisible(true); setKey(k => k+1);
-      setTimeout(() => setVisible(false), 1800);
-    }, 20000);
+      i++;
+      setTyped(text.slice(0, i));
+      if (i >= text.length) {
+        clearInterval(iv);
+        onDone?.();
+      }
+    }, speed);
     return () => clearInterval(iv);
-  }, [active]);
-
-  if (!visible) return null;
-  return (
-    <>
-      <style>{`@keyframes heartRise{0%{transform:translateY(0) scale(1);opacity:1}100%{transform:translateY(-70px) scale(.2);opacity:0}}`}</style>
-      <div key={key} style={{ position:"absolute", bottom:MIKU_H, left:"50%", pointerEvents:"none" }}>
-        {[
-          { color:"#F9A8D4", size:14, delay:0,   x:-10 },
-          { color:"#C084FC", size:12, delay:300,  x:10  },
-          { color:"#F9A8D4", size:16, delay:600,  x:0   },
-        ].map((h,i) => (
-          <span key={i} style={{
-            position:"absolute", left:h.x, bottom:0,
-            fontSize:h.size, color:h.color,
-            animation:"heartRise 1.4s ease-out forwards",
-            animationDelay:`${h.delay}ms`, opacity:0,
-          }}>♥</span>
-        ))}
-      </div>
-    </>
-  );
+  }, [text, speed, onDone]);
+  return <>{typed}</>;
 }
 
 /* ─────────────────────────────────────────────
@@ -263,104 +91,162 @@ export default function MikuCompanion() {
   // ── State ──
   const [state,       setState]       = useState<MikuState>("walking");
   const [posX,        setPosX]        = useState(-MIKU_W * 2);
-  const [posY,        setPosY]        = useState(0);      // used for sitting/dropping (px from top)
+  const [posY,        setPosY]        = useState(0); 
   const [dir,         setDir]         = useState(1);
   const [img,         setImg]         = useState("miku-walking-1");
-  const [bubble,      setBubble]      = useState<MikuMsg | null>(null);
   const [sittingCard, setSittingCard] = useState<SittingCardInfo | null>(null);
   const [bob,         setBob]         = useState(0);
   const [isDropping,  setIsDropping]  = useState(false);
   const [isMinimized, setIsMinimized] = useState(false);
-  const [ready,       setReady]       = useState(false); // true after initMiku runs
+  const [ready,       setReady]       = useState(false);
 
-  // ── Refs for use inside RAF / intervals ──
-  const stateRef  = useRef(state);  stateRef.current  = state;
-  const posXRef   = useRef(posX);   posXRef.current   = posX;
-  const dirRef    = useRef(dir);    dirRef.current    = dir;
-  const readyRef  = useRef(ready);  readyRef.current  = ready;
+  // ── Conversation State ──
+  const [conversation, setConversation] = useState<ConversationMsg[]>([]);
+  const [convCount,    setConvCount]    = useState(0);
+  const [convEnded,    setConvEnded]    = useState(false);
+  const [isTyping,     setIsTyping]     = useState(false);
+  const maxExchangesRef = useRef(Math.floor(Math.random() * 3) + 2); // 2, 3, or 4 exchanges
+
+  const stateRef = useRef(state); stateRef.current = state;
+  const posXRef  = useRef(posX);  posXRef.current  = posX;
+  const dirRef   = useRef(dir);   dirRef.current   = dir;
 
   /* ─────────────────────────────────────────
-     INIT MIKU — random start scenario
+     BUBBLE POSITIONING
+  ────────────────────────────────────────── */
+  const getBubblePosition = (mikuX: number) => {
+    if (typeof window === 'undefined') return 0;
+    const bubbleWidth = 260;
+    const screenWidth = window.innerWidth;
+    const padding     = 16;
+    
+    // Default: bubble appears to LEFT of Miku
+    let left = mikuX - bubbleWidth - 10;
+    
+    // If bubble would go off LEFT edge
+    if (left < padding) {
+      // Place bubble to RIGHT of Miku instead
+      left = mikuX + MIKU_W + 10;
+    }
+    
+    // If bubble STILL goes off RIGHT edge
+    if (left + bubbleWidth > screenWidth - padding) {
+      // Force it to stay within screen
+      left = screenWidth - bubbleWidth - padding;
+    }
+    return left;
+  };
+
+  const getBubbleTop = (mikuY_fromTop: number | undefined, mikuY_fromBottom: number | undefined) => {
+    if (typeof window === 'undefined') return 0;
+    const bubbleHeight = 160;
+    const padding      = 16;
+    const screenHeight = window.innerHeight;
+
+    let y: number;
+    if (mikuY_fromTop !== undefined) {
+      y = mikuY_fromTop;
+    } else {
+      y = screenHeight - (mikuY_fromBottom ?? 0) - MIKU_H;
+    }
+
+    let top = y - bubbleHeight - 10;
+    if (top < padding) top = padding;
+    return top;
+  };
+
+  /* ─────────────────────────────────────────
+     END CONVERSATION
+  ────────────────────────────────────────── */
+  const endConversation = useCallback(() => {
+    setConvEnded(true);
+    setTimeout(() => {
+      setConversation([]);
+      setConvEnded(false);
+      setConvCount(0);
+      maxExchangesRef.current = Math.floor(Math.random() * 3) + 2;
+      setSittingCard(null);
+      setState("walking");
+      setImg("miku-walking-1");
+    }, 1500);
+  }, []);
+
+  /* ─────────────────────────────────────────
+     REPLY LOGIC
+  ────────────────────────────────────────── */
+  const getReplyOptions = (history: ConversationMsg[]) => {
+    const lastMsg = history.filter(m => m.role === 'miku').at(-1)?.text || '';
+    if(lastMsg.includes('task') || lastMsg.includes('pending'))
+      return ['😅 Haan kar dunga', '🙄 Baad mein', '😭 Busy tha yaar'];
+    if(lastMsg.includes('DSA') || lastMsg.includes('leetcode'))
+      return ['💪 Abhi karta hoon', '😩 Kal se pakka', '🤔 Ek toh karunga'];
+    if(lastMsg.includes('so') || lastMsg.includes('raat'))
+      return ['😴 Okay so raha hoon', '😤 Ek aur ghanta', '🥺 Tu bhi so ja'];
+    if(lastMsg.includes('care') || lastMsg.includes('proud'))
+      return ['🥺 Thanks Miku', '😊 Perfect', '💕 Main bhi!'];
+    if(lastMsg.includes('Sunday') || lastMsg.includes('weekend'))
+      return ['😤 Challenge accepted', '😅 Try karunga', '🤝 Deal hai'];
+    return ['😂 Haha okay okay', '🙄 Miku please', '🥺 Sorry yaar'];
+  };
+
+  const handleUserReply = async (replyText: string) => {
+    setConversation(prev => [...prev, { role: 'user', text: replyText }]);
+    const newCount = convCount + 1;
+    setConvCount(newCount);
+    setIsTyping(true);
+
+    if (newCount >= maxExchangesRef.current) {
+      const closing = await getMikuClosingMessage(replyText, conversation);
+      setConversation(prev => [...prev, {
+        role: 'miku',
+        text: closing.message,
+        emotion: closing.emotion as Emotion
+      }]);
+      setIsTyping(false);
+      setConvEnded(true);
+      setTimeout(endConversation, 4000);
+      return;
+    }
+
+    await new Promise(r => setTimeout(r, 800));
+    const reply = await getMikuReply(replyText, conversation);
+    setConversation(prev => [...prev, {
+      role: 'miku',
+      text: reply.message,
+      emotion: reply.emotion as Emotion
+    }]);
+    setImg(`miku-${reply.emotion}`);
+    setIsTyping(false); 
+  };
+
+  /* ─────────────────────────────────────────
+     INIT MIKU
   ───────────────────────────────────────── */
   const initMiku = useCallback(() => {
-    const W        = window.innerWidth;
+    const W = window.innerWidth;
     const scenario = START_SCENARIOS[Math.floor(Math.random() * START_SCENARIOS.length)];
-    console.log('[Miku] starting scenario:', scenario);
-
     if (scenario === "walk_left_to_right") {
-      setDir(1);
-      setPosX(-MIKU_W * 2);
-      setState("walking");
-      setImg("miku-walking-1");
-      setReady(true);
-      return;
+      setDir(1); setPosX(-MIKU_W * 2); setState("walking"); setImg("miku-walking-1"); setReady(true); return;
     }
-
     if (scenario === "walk_right_to_left") {
-      setDir(-1);
-      setPosX(W + MIKU_W * 2);
-      setState("walking");
-      setImg("miku-walking-1");
-      setReady(true);
-      return;
+      setDir(-1); setPosX(W + MIKU_W * 2); setState("walking"); setImg("miku-walking-1"); setReady(true); return;
     }
-
-    // For card-based scenarios, we need DOM cards
     const cards = document.querySelectorAll("[data-task-name]");
     if (cards.length === 0) {
-      // no cards rendered yet → fallback to walk
-      setDir(1);
-      setPosX(-MIKU_W * 2);
-      setState("walking");
-      setImg("miku-walking-1");
-      setReady(true);
-      return;
+      setDir(1); setPosX(-MIKU_W * 2); setState("walking"); setImg("miku-walking-1"); setReady(true); return;
     }
-
     const card = cards[Math.floor(Math.random() * cards.length)] as HTMLElement;
     const rect = card.getBoundingClientRect();
     const targetX = rect.left + rect.width / 2 - MIKU_W / 2;
     const targetY = rect.top - MIKU_H + 20;
-
-    const cardInfo: SittingCardInfo = {
-      name: card.dataset.taskName || "",
-      date: card.dataset.taskDate || "",
-      x:    targetX,
-      y:    targetY,
-    };
-
     if (scenario === "already_sitting") {
-      setPosX(targetX);
-      setPosY(targetY);
-      setImg("miku-sitting");
-      setSittingCard(cardInfo);
-      setState("sitting");
-      setReady(true);
-      return;
+      setPosX(targetX); setPosY(targetY); setImg("miku-sitting"); setSittingCard({ name: card.dataset.taskName || "", date: card.dataset.taskDate || "", x: targetX, y: targetY }); setState("sitting"); setReady(true); return;
     }
-
-    // drop_from_top
-    setPosX(targetX);
-    setPosY(targetY - 220);
-    setImg("miku-excited");
-    setIsDropping(true);
-    setState("dropping");
-    setReady(true);
-
-    setTimeout(() => {
-      setIsDropping(false);
-      setPosY(targetY);
-      setImg("miku-sitting");
-      setSittingCard(cardInfo);
-      setState("sitting");
-    }, 650);
+    setPosX(targetX); setPosY(targetY - 220); setImg("miku-excited"); setIsDropping(true); setState("dropping"); setReady(true);
+    setTimeout(() => { setIsDropping(false); setPosY(targetY); setImg("miku-sitting"); setSittingCard({ name: card.dataset.taskName || "", date: card.dataset.taskDate || "", x: targetX, y: targetY }); setState("sitting"); }, 650);
   }, []);
 
-  /* ── MOUNT: init after 1.5s so DOM cards are rendered ── */
-  useEffect(() => {
-    const t = setTimeout(initMiku, 1500);
-    return () => clearTimeout(t);
-  }, [initMiku]);
+  useEffect(() => { const t = setTimeout(initMiku, 1500); return () => clearTimeout(t); }, [initMiku]);
 
   /* ─────────────────────────────────────────
      WALKING RAF
@@ -369,21 +255,14 @@ export default function MikuCompanion() {
     if (state !== "walking") return;
     let raf: number;
     const tick = () => {
-      const W = window.innerWidth;
       setPosX(x => {
+        const W = window.innerWidth;
         const nx = x + SPEED * dirRef.current;
-        // walked fully off screen → pause then re-init
         if (nx > W + MIKU_W * 2 || nx < -MIKU_W * 2) {
           cancelAnimationFrame(raf);
-          const pause = Math.random() * 3000 + 2000;
-          setTimeout(() => {
-            setBubble(null);
-            setSittingCard(null);
-            initMiku();
-          }, pause);
+          setTimeout(initMiku, Math.random() * 3000 + 2000);
           return nx;
         }
-        // bounce off soft edge while mid-screen
         if (nx > W + 150) { setDir(-1); return nx; }
         if (nx < -150)    { setDir(1);  return nx; }
         return nx;
@@ -394,7 +273,6 @@ export default function MikuCompanion() {
     return () => cancelAnimationFrame(raf);
   }, [state, initMiku]);
 
-  /* ── BOB WHILE WALKING ── */
   useEffect(() => {
     if (state !== "walking") return;
     let t = 0;
@@ -403,305 +281,161 @@ export default function MikuCompanion() {
   }, [state]);
 
   /* ─────────────────────────────────────────
-     RANDOM STOP TO TALK (8–18 s)
-  ───────────────────────────────────────── */
+     TRIGGERS
+  ────────────────────────────────────────── */
+  const triggerTalking = async (type: string, tName?: string) => {
+    if (stateRef.current !== "walking" && stateRef.current !== "sitting" && stateRef.current !== "dropping") return;
+    const oldState = stateRef.current;
+    setState("talking");
+    setImg("miku-thinking");
+    setIsTyping(true);
+    const msg = await generateMikuMessage(type, tName);
+    setConversation([{ role: 'miku', text: msg.message, emotion: msg.emotion as Emotion }]);
+    setImg(`miku-${msg.emotion}`);
+    setIsTyping(false);
+  };
+
   useEffect(() => {
     if (state !== "walking") return;
-    const hour = new Date().getHours();
-    const day  = new Date().getDay();
-    const isSundayMorning = day === 0 && hour < 12;
-
-    let msgType = "random_stop";
-    if (hour >= 6 && hour < 9)         msgType = "morning_checkin";
-    else if (hour >= 23 || hour < 5)   msgType = "late_night";
-    else if (isSundayMorning)          msgType = "give_challenge";
-    else if (Math.random() < 0.3)
-      msgType = Math.random() < 0.5 ? "random_sweet" : "random_flirt";
-    else if ([0, 6].includes(day) && Math.random() < 0.4)
-      msgType = "give_challenge";
-
-    const delay = Math.random() * 10000 + 8000;
-    const t = setTimeout(async () => {
-      if (stateRef.current !== "walking") return;
-      setState("talking");
-      setImg("miku-thinking");
-      await new Promise(r => setTimeout(r, 600));
-      const msg = await fetchMikuMsg(msgType);
-      setImg(`miku-${msg.emotion}`);
-      setBubble(msg);
-    }, delay);
+    const delay = Math.random() * 10000 + 12000;
+    const t = setTimeout(() => triggerTalking("random_stop"), delay);
     return () => clearTimeout(t);
   }, [state]);
 
-  /* ─────────────────────────────────────────
-     SITTING ON TASK CARDS (proximity check)
-  ───────────────────────────────────────── */
   useEffect(() => {
-    if (state !== "walking") return;
-    const check = setInterval(() => {
-      const cards = document.querySelectorAll("[data-task-name]");
-      for (const card of Array.from(cards)) {
-        const el   = card as HTMLElement;
-        const rect = el.getBoundingClientRect();
-        const cardCenterX = rect.left + rect.width / 2;
+    if (state !== "sitting" || !sittingCard || conversation.length > 0) return;
+    const t = setTimeout(() => triggerTalking("sitting_on_card", sittingCard.name), 800);
+    return () => clearTimeout(t);
+  }, [state, sittingCard, conversation.length]);
 
-        const taskId = el.dataset.taskId || el.dataset.taskName || "";
-        const roasted: string[] = JSON.parse(
-          localStorage.getItem("miku_roasted_tasks") || "[]"
-        );
-        if (roasted.includes(taskId)) continue;
-
-        if (Math.abs(posXRef.current - cardCenterX) < 80 && Math.random() < 0.25) {
-          const cardInfo: SittingCardInfo = {
-            name: el.dataset.taskName || "",
-            date: el.dataset.taskDate || "",
-            x:    rect.left + rect.width / 2 - MIKU_W / 2,
-            y:    rect.top  - MIKU_H + 20,
-          };
-          setState("sitting");
-          setSittingCard(cardInfo);
-          localStorage.setItem("miku_roasted_tasks",
-            JSON.stringify([...roasted, taskId])
-          );
-          break;
-        }
-      }
-    }, 2000);
-    return () => clearInterval(check);
-  }, [state]);
-
-  /* ─────────────────────────────────────────
-     SITTING LOGIC
-  ───────────────────────────────────────── */
+  const onTaskDone = () => triggerTalking("task_done_react");
+  const onDsa      = () => triggerTalking("dsa_roast");
   useEffect(() => {
-    if (state !== "sitting" || !sittingCard) return;
-    setImg("miku-sitting");
-
-    const run = async () => {
-      await new Promise(r => setTimeout(r, 800));
-      const msg = await fetchMikuMsg("sitting_on_card", sittingCard.name);
-      setImg(`miku-${msg.emotion}`);
-      setBubble(msg);
-
-      await new Promise(r => setTimeout(r, 6000));
-      setBubble(null);
-      setSittingCard(null);
-      setState("walking");
-      setDir(Math.random() < 0.5 ? 1 : -1);
-      setImg("miku-walking-1");
-    };
-    run();
-  }, [state, sittingCard]);
-
-  /* ─────────────────────────────────────────
-     DISMISS BUBBLE
-  ───────────────────────────────────────── */
-  const dismissBubble = useCallback(() => {
-    setBubble(null);
-    if (state === "talking") {
-      setState("walking");
-      setImg("miku-walking-1");
-    } else if (state === "sitting") {
-      setSittingCard(null);
-      setState("walking");
-      setDir(Math.random() < 0.5 ? 1 : -1);
-      setImg("miku-walking-1");
-    }
-  }, [state]);
+    window.addEventListener("taskCompleted", onTaskDone);
+    window.addEventListener("dsaSolved", onDsa);
+    return () => { window.removeEventListener("taskCompleted", onTaskDone); window.removeEventListener("dsaSolved", onDsa); };
+  }, []);
 
   /* ─────────────────────────────────────────
      HOVER / CLICK
-  ───────────────────────────────────────── */
-  const handleMouseEnter = useCallback(() => {
-    if (state === "walking") {
-      setState("hover");
-      setImg("miku-blush");
-      setBubble({ emotion:"blush", text:"K-kya dekh raha hai...?! 😳" });
-    }
-  }, [state]);
-
-  const handleMouseLeave = useCallback(() => {
-    if (state === "hover") {
-      setBubble(null);
-      const t = setTimeout(() => { setState("walking"); setImg("miku-walking-1"); }, 1500);
-      return () => clearTimeout(t);
-    }
-  }, [state]);
-
-  const handleClick = useCallback(async () => {
-    if (state === "talking" || state === "sitting" || state === "dropping") return;
-    setState("bounce");
-    setImg("miku-excited");
-    await new Promise(r => setTimeout(r, 400));
-    setState("talking");
-    const type = Math.random() < 0.5 ? "random_sweet" : "random_flirt";
-    const msg  = await fetchMikuMsg(type);
-    setImg(`miku-${msg.emotion}`);
-    setBubble(msg);
-  }, [state]);
-
-  /* ── TASK COMPLETED event ── */
-  useEffect(() => {
-    const onTaskDone = async () => {
-      if (stateRef.current === "sitting") return;
-      setState("talking");
-      setImg("miku-excited");
-      const msg = await fetchMikuMsg("task_done_react");
-      setImg(`miku-${msg.emotion}`);
-      setBubble(msg);
-    };
-    window.addEventListener("taskCompleted", onTaskDone);
-    return () => window.removeEventListener("taskCompleted", onTaskDone);
-  }, []);
-
-  /* ── DSA SOLVED event ── */
-  useEffect(() => {
-    const onDsa = async () => {
-      setState("talking");
-      setImg("miku-excited");
-      const msg = await fetchMikuMsg("dsa_roast");
-      setImg(`miku-${msg.emotion}`);
-      setBubble(msg);
-    };
-    window.addEventListener("dsaSolved", onDsa);
-    return () => window.removeEventListener("dsaSolved", onDsa);
-  }, []);
-
-  /* ── Track message count ── */
-  useEffect(() => {
-    if (!bubble) return;
-    const count = parseInt(localStorage.getItem("miku_total_messages") || "0");
-    localStorage.setItem("miku_total_messages", String(count + 1));
-    localStorage.setItem("miku_last_seen", String(Date.now()));
-  }, [bubble]);
+  ────────────────────────────────────────── */
+  const handleMouseEnter = () => { if (state === "walking" && conversation.length === 0) { setState("hover"); setImg("miku-blush"); setConversation([{ role: 'miku', text: "K-kya dekh raha hai...?! 😳", emotion: 'blush' }]); } };
+  const handleMouseLeave = () => { if (state === "hover") { setConversation([]); setState("walking"); setImg("miku-walking-1"); } };
+  const handleClick = async () => { if (state === "talking" || conversation.length > 0) return; setState("bounce"); setImg("miku-excited"); await new Promise(r => setTimeout(r, 400)); triggerTalking("random_sweet"); };
 
   /* ─────────────────────────────────────────
-     COMPUTE POSITION
-  ───────────────────────────────────────── */
-  const isSitting   = (state === "sitting" || state === "dropping") && sittingCard;
-  const isDropScen  = state === "dropping";
+     COMPUTE UI
+  ────────────────────────────────────────── */
+  const isSitt = (state === "sitting" || state === "dropping") && sittingCard;
+  const fLeft  = isSitt ? sittingCard!.x : posX - MIKU_W/2;
+  const fBott  = isSitt ? undefined : FLOOR_Y + bob;
+  const fTop   = isSitt ? (state === "dropping" ? posY : sittingCard!.y) : undefined;
+  const iFlip  = dir === -1 && state === "walking" ? "scaleX(-1)" : "none";
+  const iSrc   = resolveImg(img);
 
-  // When sitting/dropping: position by fixed top/left in viewport
-  // When walking: fixed left + bottom
-  const fixedLeft   = isSitting ? sittingCard!.x : (state === "dropping" && !sittingCard ? posX : posX - MIKU_W / 2);
-  const fixedBottom = isSitting ? undefined  : FLOOR_Y + bob;
-  const fixedTop    = isSitting ? (isDropScen ? posY : sittingCard!.y) : undefined;
-
-  const imgFlip = dir === -1 && state === "walking" ? "scaleX(-1)" : "none";
-  const imgSrc  = resolveImg(img);
-
-  /* ─────────────────────────────────────────
-     MINIMIZED
-  ───────────────────────────────────────── */
-  if (isMinimized) {
-    return (
-      <button
-        onClick={() => setIsMinimized(false)}
-        title="Bring back Miku"
-        style={{
-          position:"fixed", bottom:20, right:20, zIndex:99999,
-          background:"linear-gradient(135deg,#C084FC,#EC4899)",
-          border:"none", borderRadius:"50%", width:40, height:40,
-          fontSize:20, cursor:"pointer",
-          boxShadow:"0 4px 16px rgba(168,85,247,0.4)",
-        }}
-      >💜</button>
-    );
-  }
+  const bubbleLeft = getBubblePosition(fLeft);
+  const bubbleTop  = getBubbleTop(fTop, fBott);
 
   return (
     <>
       <style>{`
-        @keyframes dropBounce {
-          0%   { transform: translateY(0); }
-          70%  { transform: translateY(10px); }
-          85%  { transform: translateY(-8px); }
-          100% { transform: translateY(0); }
-        }
-        @keyframes sitDown {
-          0%   { transform: translateY(-20px); opacity:0; }
-          60%  { transform: translateY(4px); }
-          100% { transform: translateY(0); opacity:1; }
-        }
-        @keyframes mikuBounce {
-          0%   { transform: translateY(0); }
-          40%  { transform: translateY(-25px); }
-          70%  { transform: translateY(-10px); }
-          100% { transform: translateY(0); }
-        }
+        @keyframes dropBounce { 0%{transform:translateY(0)} 70%{transform:translateY(10px)} 85%{transform:translateY(-8px)} 100%{transform:translateY(0)} }
+        @keyframes sitDown { 0%{transform:translateY(-20px);opacity:0} 60%{transform:translateY(4px)} 100%{transform:translateY(0);opacity:1} }
+        @keyframes mikuBounce { 0%{transform:translateY(0)} 40%{transform:translateY(-25px)} 70%{transform:translateY(-10px)} 100%{transform:translateY(0)} }
+        @keyframes typingBounce { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-4px)} }
+        .typing-dot { width:6px; height:6px; background:#C084FC; border-radius:50%; animation:typingBounce 0.8s infinite; }
+        .miku-chat-window p { word-wrap:break-word; overflow-wrap:break-word; white-space:normal; }
       `}</style>
 
-      <div
-        style={{
-          position:  "fixed",
-          left:      fixedLeft,
-          bottom:    fixedBottom,
-          top:       fixedTop,
-          width:     MIKU_W,
-          height:    MIKU_H,
-          zIndex:    99998,
-          userSelect:"none",
-          pointerEvents:"auto",
-          animation:
-            state === "dropping"
-              ? "dropBounce 0.65s ease-out forwards"
-              : state === "sitting"
-              ? "sitDown 0.5s cubic-bezier(0.34,1.56,0.64,1) forwards"
-              : state === "bounce"
-              ? "mikuBounce 0.5s ease"
-              : "none",
-        }}
-        onMouseEnter={handleMouseEnter}
-        onMouseLeave={handleMouseLeave}
-        onClick={handleClick}
-        title="Miku is here! Click me 💕"
-      >
-        {/* Speech bubble */}
-        <MikuSpeechBubble
-          msg={bubble}
-          emotion={(img.replace("miku-","") as Emotion) || "happy"}
-          onDismiss={dismissBubble}
-        />
-
-        {/* Floating hearts */}
-        <FloatingHearts active={state === "walking"} />
-
-        {/* Dust puffs — on walking AND on landing */}
-        <DustPuffs active={state === "walking" || (state === "sitting" && !bubble)} />
-
-        {/* Miku image */}
-        <div style={{
-          position:"relative", width:MIKU_W, height:MIKU_H,
-          transform: imgFlip,
-          cursor: state === "walking" ? "pointer" : "default",
-          filter:"drop-shadow(0 8px 24px rgba(168,85,247,0.3))",
-          transition:"transform 0.15s ease",
+      {/* CHAT WINDOW */}
+      {conversation.length > 0 && (
+        <div className="miku-chat-window" style={{
+          position: 'fixed', left: bubbleLeft, top: bubbleTop, width: '280px',
+          background: 'white', borderRadius: '18px', border: '2px solid #F9A8D4',
+          boxShadow: '0 8px 32px rgba(236,72,153,0.2)', overflow: 'hidden', zIndex: 10000,
+          pointerEvents: 'auto', display: 'flex', flexDirection: 'column'
         }}>
-          <Image
-            src={imgSrc}
-            alt="Miku"
-            fill
-            style={{ objectFit:"contain" }}
-            priority
-          />
-        </div>
+          {/* Header */}
+          <div style={{ background: 'linear-gradient(135deg, #F9A8D4, #C084FC)', padding: '8px 12px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <Image src={`/miku_images/miku-${conversation.filter(m => m.role === 'miku').at(-1)?.emotion || 'happy'}.png`} alt="" width={28} height={28} style={{ borderRadius: '50%', objectFit: 'cover' }} />
+              <span style={{ color: 'white', fontWeight: 700, fontSize: 13 }}>Miku 💕</span>
+            </div>
+            <button onClick={endConversation} style={{ background: 'none', border: 'none', color: 'white', cursor: 'pointer', fontSize: 16 }}>×</button>
+          </div>
 
-        {/* Minimize × */}
-        <button
-          title="Minimize Miku"
-          onClick={e => { e.stopPropagation(); setIsMinimized(true); }}
-          style={{
-            position:"absolute", top:-8, right:-8,
-            width:18, height:18, borderRadius:"50%",
-            background:"rgba(236,72,153,0.85)",
-            border:"none", color:"white", fontSize:9, cursor:"pointer",
-            display:"flex", alignItems:"center", justifyContent:"center",
-            opacity:0, transition:"opacity 0.2s", zIndex:99999, lineHeight:1,
-          }}
-          onMouseEnter={e => (e.currentTarget.style.opacity = "1")}
-          onMouseLeave={e => (e.currentTarget.style.opacity = "0")}
-        >✕</button>
-      </div>
+          {/* Messages */}
+          <div style={{ maxHeight: '200px', overflowY: 'auto', padding: '10px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+            {conversation.map((msg, i) => (
+              <div key={i} style={{ display: 'flex', justifyContent: msg.role === 'miku' ? 'flex-start' : 'flex-end' }}>
+                <div style={{
+                  background: msg.role === 'miku' ? '#FDF2F8' : '#EF5A2A',
+                  color: msg.role === 'miku' ? '#1f2937' : 'white',
+                  borderRadius: msg.role === 'miku' ? '4px 18px 18px 18px' : '18px 4px 18px 18px',
+                  padding: '8px 12px', fontSize: '13px', maxWidth: '85%', lineHeight: 1.4,
+                }}>
+                  {msg.role === 'miku' && i === conversation.length - 1 && isTyping 
+                    ? <TypewriterText text={msg.text} speed={25} onDone={() => setIsTyping(false)} />
+                    : msg.text
+                  }
+                </div>
+              </div>
+            ))}
+            {isTyping && conversation.length > 0 && conversation[conversation.length - 1].role === 'user' && (
+              <div style={{ display: 'flex', gap: 4, padding: '4px 8px' }}>
+                <span className="typing-dot" />
+                <span className="typing-dot" style={{ animationDelay: '0.2s' }} />
+                <span className="typing-dot" style={{ animationDelay: '0.4s' }} />
+              </div>
+            )}
+          </div>
+
+          {/* Repiles */}
+          {!isTyping && !convEnded && conversation.length > 0 && (
+            <div style={{ padding: '8px 10px', borderTop: '1px solid #FDE7F3' }}>
+              {convCount < maxExchangesRef.current ? (
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                  {getReplyOptions(conversation).map((opt, i) => (
+                    <button key={i} onClick={() => handleUserReply(opt)} style={{
+                      background: i === 0 ? '#FDF2F8' : '#F3F4F6', border: i === 0 ? '1px solid #F9A8D4' : '1px solid #E5E7EB',
+                      borderRadius: '20px', padding: '5px 12px', fontSize: '12px', cursor: 'pointer', color: '#374151',
+                    }}>{opt}</button>
+                  ))}
+                </div>
+              ) : (
+                <div style={{ display: 'flex', gap: 6 }}>
+                  <button onClick={endConversation} style={{ background: '#FDF2F8', border: '1px solid #F9A8D4', borderRadius: '20px', padding: '5px 14px', fontSize: '12px', cursor: 'pointer', flex: 1 }}>😊 Okay Miku!</button>
+                  <button onClick={endConversation} style={{ background: '#F3F4F6', border: '1px solid #E5E7EB', borderRadius: '20px', padding: '5px 14px', fontSize: '12px', cursor: 'pointer', flex: 1 }}>😤 Fine fine</button>
+                </div>
+              )}
+            </div>
+          )}
+
+          {convEnded && (
+            <div style={{ padding: '8px', textAlign: 'center', fontSize: '12px', color: '#9CA3AF', borderTop: '1px solid #FDE7F3' }}>
+              Miku walked away... 🐾
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* MIKU CHARACTER */}
+      {!isMinimized && (
+        <div style={{
+          position: "fixed", left: fLeft, bottom: fBott, top: fTop, width: MIKU_W, height: MIKU_H, zIndex: 99998,
+          userSelect: "none", pointerEvents: "auto",
+          animation: state === "dropping" ? "dropBounce 0.65s ease-out forwards" : state === "sitting" ? "sitDown 0.5s cubic-bezier(0.34,1.56,0.64,1) forwards" : state === "bounce" ? "mikuBounce 0.5s ease" : "none",
+        }} onMouseEnter={handleMouseEnter} onMouseLeave={handleMouseLeave} onClick={handleClick}>
+          <div style={{ position: "relative", width: MIKU_W, height: MIKU_H, transform: iFlip, cursor: state === "walking" ? "pointer" : "default", filter: "drop-shadow(0 8px 24px rgba(168,85,247,0.3))", transition: "transform 0.15s ease" }}>
+            <Image src={iSrc} alt="Miku" fill style={{ objectFit: "contain" }} priority />
+          </div>
+          <button title="Minimize" onClick={e => { e.stopPropagation(); setIsMinimized(true); }} style={{ position: "absolute", top: -8, right: -8, width: 18, height: 18, borderRadius: "50%", background: "rgba(236,72,153,0.85)", border: "none", color: "white", fontSize: 9, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", opacity: 0, transition: "opacity 0.2s", zIndex: 99999 }} onMouseEnter={e => (e.currentTarget.style.opacity = "1")} onMouseLeave={e => (e.currentTarget.style.opacity = "0")}>✕</button>
+        </div>
+      )}
+
+      {isMinimized && (
+        <button onClick={() => setIsMinimized(false)} style={{ position: "fixed", bottom: 20, right: 20, zIndex: 99999, background: "linear-gradient(135deg,#C084FC,#EC4899)", border: "none", borderRadius: "50%", width: 40, height: 40, fontSize: 20, cursor: "pointer", boxShadow: "0 4px 16px rgba(168,85,247,0.4)" }}>💜</button>
+      )}
     </>
   );
 }

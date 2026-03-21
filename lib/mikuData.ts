@@ -107,31 +107,38 @@ export async function getMikuContext(userId = FIXED_USER_ID) {
     // Table might not exist yet — silently continue
   }
 
-  return {
-    // Tasks
-    pendingCount: pending.length,
-    pendingNames: pending.slice(0, 5).map((t) => t.title),
-    completedTodayCount: completedToday.length,
-    completedTodayNames: completedToday.map((t) => t.title),
-    oldestPendingName: oldestPending?.title || null,
-    oldestPendingDays: oldestDays,
-    dailyNotDoneNames: dailyNotDone.map((t) => t.title),
-    longPendingNames: longPending.map((t) => t.title),
-
-    // DSA
-    dsaTotal: dsa.total,
-    dsaToday: dsa.today,
-    dsaThisWeek: dsa.week,
-    dsaTotalGoal: 455,
-
     // Time context
-    hour: now.getHours(),
-    dayName: ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'][now.getDay()],
-    isWeekend: [0, 6].includes(now.getDay()),
-    isSunday: now.getDay() === 0,
+    const rawHour = now.getHours();
+    const hour12 = rawHour % 12 || 12;
+    const ampm = rawHour >= 12 ? 'PM' : 'AM';
+    const hourDisplay = `${hour12}:${String(now.getMinutes()).padStart(2, '0')} ${ampm}`;
 
-    // User
-    userName: 'bhai',
+    return {
+      // Tasks
+      pendingCount: pending.length,
+      pendingNames: pending.slice(0, 5).map((t) => t.title),
+      completedTodayCount: completedToday.length,
+      completedTodayNames: completedToday.map((t) => t.title),
+      oldestPendingName: oldestPending?.title || null,
+      oldestPendingDays: oldestDays,
+      dailyNotDoneNames: dailyNotDone.map((t) => t.title),
+      longPendingNames: longPending.map((t) => t.title),
+
+      // DSA
+      dsaTotal: dsa.total,
+      dsaToday: dsa.today,
+      dsaThisWeek: dsa.week,
+      dsaTotalGoal: 455,
+
+      // Time context
+      hour: rawHour,
+      hourDisplay,
+      dayName: ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'][now.getDay()],
+      isWeekend: [0, 6].includes(now.getDay()),
+      isSunday: now.getDay() === 0,
+
+      // User
+      userName: 'bhai',
 
     // Miku history
     lastMessages,
