@@ -6,7 +6,12 @@ import React, {
   useRef,
   useCallback,
 } from "react";
-import { generateMikuMessage, getMikuReply, getMikuClosingMessage } from "@/lib/mikuEngine";
+import { 
+  getMikuMessageOnly, 
+  getMikuOptionsForMessage,
+  getMikuReplyOnly, 
+  getMikuClosingMessage 
+} from "@/lib/mikuEngine";
 
 /* ─────────────────────────────────────────────
    IMAGE RESOLUTION
@@ -286,22 +291,37 @@ export default function MikuCompanion() {
       result = await getMikuClosingMessage(replyText, historySnapshot);
       setConvEnded(true);
     } else {
-      result = await getMikuReply(replyText, historySnapshot);
+      result = await getMikuReplyOnly(replyText, historySnapshot);
     }
 
     setMikuLoading(false);
     setReplyLoading(false);
-    setConversation(prev => [...prev, {
-      role: 'miku',
-      text: result.message,
-      emotion: result.emotion as Emotion
-    }]);
-    setReplyOptions(result.options || []);
+    
+    // Set message and emotion immediately to start typewriter
     setCurrentMsg(result.message);
     setEmotion(result.emotion as Emotion);
     changeMikuExpression(result.emotion);
     setShowBubble(true);
     setBubbleOpacity(1);
+
+    // Update conversation state
+    const mikuMsg: ConversationMsg = {
+      role: 'miku',
+      text: result.message,
+      emotion: result.emotion as Emotion
+    };
+    setConversation(prev => [...prev, mikuMsg]);
+    setReplyOptions(result.options || []);
+
+    // Background load options if not ended
+    if (!convEnded && !(newCount >= maxExchangesRef.current)) {
+      getMikuOptionsForMessage(result.message).then(opts => {
+        setReplyOptions(opts);
+      });
+    } else {
+      setReplyOptions([]);
+    }
+
   };
 
   /* ─────────────────────────────────────────
@@ -407,14 +427,20 @@ export default function MikuCompanion() {
         // Step 3: Small pause
         await new Promise(r => setTimeout(r, 80));
 
-        const result = await generateMikuMessage('sitting_on_card', card.dataset.taskName);
+        const result = await getMikuMessageOnly('sitting_on_card', card.dataset.taskName);
         
         setMikuLoading(false);
         setEmotion(result.emotion as Emotion);
         changeMikuExpression(result.emotion);
         setConversation([{ role: 'miku', text: result.message, emotion: result.emotion as Emotion }]);
-        setReplyOptions(result.options || []);
         setCurrentMsg(result.message);
+        setReplyOptions(result.options || []);
+
+        // Background load BETTER options
+        getMikuOptionsForMessage(result.message).then(opts => {
+          setReplyOptions(opts);
+        });
+
       }, 1500);
     }
   }, []);
@@ -551,15 +577,21 @@ export default function MikuCompanion() {
             setIsTyping(false);
             setShowBubble(false);
 
-            const result = await generateMikuMessage('sitting_on_card', el.dataset.taskName);
+            const result = await getMikuMessageOnly('sitting_on_card', el.dataset.taskName);
             setMikuLoading(false);
             setEmotion(result.emotion as Emotion);
             changeMikuExpression(result.emotion);
             setConversation([{ role: 'miku', text: result.message, emotion: result.emotion as Emotion }]);
-            setReplyOptions(result.options || []);
             setCurrentMsg(result.message);
             setShowBubble(true);
             setBubbleOpacity(1);
+            setReplyOptions(result.options || []);
+
+            // Background load BETTER options
+            getMikuOptionsForMessage(result.message).then(opts => {
+              setReplyOptions(opts);
+            });
+
           }, 800);
         });
       }
@@ -653,14 +685,20 @@ export default function MikuCompanion() {
     // Step 3: Small pause
     await new Promise(r => setTimeout(r, 80));
 
-    const result = await generateMikuMessage(type, tName);
+    const result = await getMikuMessageOnly(type, tName);
     
     setMikuLoading(false);
     setEmotion(result.emotion as Emotion);
     changeMikuExpression(result.emotion);
     setConversation([{ role: 'miku', text: result.message, emotion: result.emotion as Emotion }]);
-    setReplyOptions(result.options || []);
     setCurrentMsg(result.message);
+    setReplyOptions(result.options || []);
+
+    // Background load BETTER options
+    getMikuOptionsForMessage(result.message).then(opts => {
+      setReplyOptions(opts);
+    });
+
   };
 
   useEffect(() => {

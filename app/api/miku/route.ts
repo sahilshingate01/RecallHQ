@@ -107,7 +107,7 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    return NextResponse.json({ emotion, message, options });
+    return NextResponse.json({ emotion, message, options, raw });
   } catch (err) {
     console.error('[Miku API route] fetch error:', err);
     return NextResponse.json({ error: 'Failed to reach NVIDIA API' }, { status: 502 });

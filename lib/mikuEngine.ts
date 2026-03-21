@@ -39,9 +39,9 @@ RULES:
 - 1-2 lines MAX
 - Hinglish natural
 - Start with [emotion] tag (one of: [happy], [sad], [angry], [excited], [love], [thinking], [blush])
-- After your message, on a NEW LINE write exactly: OPTIONS: [option1] | [option2] | [option3]
-- Options must match what you asked. Short, max 4 words each, conversational.
+- Do NOT write anything else after the message. No options.
 - Feel like a real text, not an AI response.
+
 `;
 
 /* ─────────────────────────────────────────────
@@ -94,7 +94,7 @@ const getNextTopic = (ctx: any) => {
 /* ─────────────────────────────────────────────
    HELPER — Call NVIDIA API route
 ───────────────────────────────────────────── */
-async function callInternalApi(system: string, user: string | any[]): Promise<{ emotion: string; message: string; options?: string[] }> {
+async function callInternalApi(system: string, user: string | any[]): Promise<{ emotion: string; message: string; options?: string[]; raw: string }> {
   try {
     const res = await fetch('/api/miku', {
       method: 'POST',
@@ -108,30 +108,37 @@ async function callInternalApi(system: string, user: string | any[]): Promise<{ 
     if (!res.ok) {
       const errText = await res.text();
       console.error('[Miku API] error:', res.status, errText);
-      return { emotion: 'thinking', message: 'Ek second ruk... 🤔', options: ['Theek hai', 'Wait karta hoon', 'Kya hua?'] };
+      return { emotion: 'thinking', message: 'Ek second ruk... 🤔', options: ['Theek hai', 'Wait karta hoon', 'Kya hua?'], raw: '' };
     }
 
     return await res.json();
   } catch (err) {
     console.error('[Miku API] fetch error:', err);
-    return { emotion: 'thinking', message: 'Ek second... kuch sochna pad raha hai 🤔', options: ['Okay', 'No problem', 'Arre?'] };
+    return { emotion: 'thinking', message: 'Ek second... kuch sochna pad raha hai 🤔', options: ['Okay', 'No problem', 'Arre?'], raw: '' };
   }
 }
+
 
 /* ─────────────────────────────────────────────
    MAIN GENERATOR
 ───────────────────────────────────────────── */
-export async function generateMikuMessage(
+/* ─────────────────────────────────────────────
+   SEPARATE CALLS — NEW LOGIC
+   1. Get Message
+   2. Get Options
+───────────────────────────────────────────── */
+
+export async function getMikuMessageOnly(
   triggerType: string,
   taskName?: string,
   userId?: string
-): Promise<{ emotion: string; message: string; options?: string[] }> {
+): Promise<{ emotion: string; message: string; options: string[] }> {
   let ctx: any;
   try {
     ctx = await getMikuContext(userId);
   } catch (err) {
     console.error('[Miku] getMikuContext failed:', err);
-    return { emotion: 'thinking', message: 'Data load karne mein ek second laga... 🤔' };
+    return { emotion: 'thinking', message: 'Data load karne mein ek second laga... 🤔', options: ['Okay'] };
   }
 
   const topic = (triggerType === 'sitting_on_card' || triggerType === 'task_done_react' || triggerType === 'dsa_roast') 
@@ -156,7 +163,7 @@ export async function generateMikuMessage(
   const situationPrompt = `${historyBlock}\nREAL CONTEXT: ${ctx.hourDisplay}, ${ctx.dayName}. Pending: ${ctx.pendingCount}. DSA: ${ctx.dsaToday}. 
   TOPIC: ${topic}. 
   ${topicPrompts[topic] || topicPrompts.life_question}
-  STRICT RULE: Maximum 15 words for the message. One punchy sentence. Then OPTIONS line.`;
+  STRICT RULE: Maximum 15 words for the message. One punchy sentence. NO OPTIONS.`;
 
   const result = await callInternalApi(MIKU_SYSTEM, situationPrompt);
 
@@ -164,14 +171,82 @@ export async function generateMikuMessage(
     await saveMikuMessage(result.message, triggerType, userId);
   }
 
-  return result;
+  // Initial fallback options while waiting for Call 2
+  return { ...result, options: generateFallbackOptions(result.message) };
 }
 
-export async function getMikuReply(
+export async function getMikuOptionsForMessage(message: string): Promise<string[]> {
+  const result = await callInternalApi(
+    `You generate short reply button options for a chat. Rules:
+- Exactly 3 options
+- Each option max 4 words
+- Must be direct replies to the message
+- Natural conversational Hindi/Hinglish
+- Output ONLY this format, nothing else:
+[option1] | [option2] | [option3]`,
+    `Miku said: "${message}"\nGenerate 3 reply options the user could say back. Output only: [opt1] | [opt2] | [opt3]`
+  );
+
+  const raw = result.raw || '';
+  const optMatches = raw.match(/\[([^\]]+)\]/g);
+  
+  if (optMatches && optMatches.length >= 3) {
+    return optMatches.slice(0, 3).map(o => o.replace(/[\[\]]/g, '').trim());
+  }
+
+  return generateFallbackOptions(message);
+}
+
+// Smart fallback based on message content
+function generateFallbackOptions(message: string): string[] {
+  const msg = message.toLowerCase();
+  
+  if(msg.includes('class') || msg.includes('college'))
+    return ['Acha tha yaar', 'Boring tha', 'Bunk kiya 😅'];
+  
+  if(msg.includes('kha') || msg.includes('lunch') || 
+     msg.includes('food'))
+    return ['Haan kha liya', 'Abhi nahi kiya', 'Kuch nahi mila'];
+  
+  if(msg.includes('so') || msg.includes('neend') ||
+     msg.includes('raat'))
+    return ['So raha hoon', 'Thoda aur jaag', '2 baje tak 😬'];
+  
+  if(msg.includes('kaam') || msg.includes('task') ||
+     msg.includes('pending'))
+    return ['Kar dunga aaj', 'Kal pakka', 'Busy tha yaar'];
+  
+  if(msg.includes('dsa') || msg.includes('leetcode') ||
+     msg.includes('code'))
+    return ['Abhi karta hoon', 'Kal se start', 'Ek toh karunga'];
+  
+  if(msg.includes('feel') || msg.includes('theek') ||
+     msg.includes('kesa'))
+    return ['Sab theek hai', 'Thak gaya hoon', 'Bas chal raha'];
+  
+  if(msg.includes('?')) // any question
+    return ['Haan bilkul', 'Nahi yaar', 'Pata nahi abhi'];
+    
+  return ['Sahi bola', 'Hmm okay', 'Chal theek hai'];
+}
+
+export async function generateMikuMessage(
+  triggerType: string,
+  taskName?: string,
+  userId?: string
+): Promise<{ emotion: string; message: string; options?: string[] }> {
+  // Backwards compatibility, though new code will use separate calls
+  const msgResult = await getMikuMessageOnly(triggerType, taskName, userId);
+  const options = await getMikuOptionsForMessage(msgResult.message);
+  return { ...msgResult, options };
+}
+
+
+export async function getMikuReplyOnly(
   userReply: string,
   history: { role: 'miku' | 'user'; text: string }[],
   userId?: string
-): Promise<{ emotion: string; message: string; options?: string[] }> {
+): Promise<{ emotion: string; message: string; options: string[] }> {
   const ctx = await getMikuContext(userId);
   const conversationHistory = history.map(m => ({
     role: m.role === 'miku' ? 'assistant' : 'user',
@@ -180,14 +255,27 @@ export async function getMikuReply(
 
   const prompt = `REAL CONTEXT: ${ctx.pendingCount} tasks, DSA: ${ctx.dsaToday}, Time: ${ctx.hourDisplay}.
   Reply naturally in Hinglish. Be yourself. Keep it short.
-  STRICT RULE: Max 15 words for reply. Then OPTIONS line.`;
+  STRICT RULE: Max 15 words for reply. NO OPTIONS.`;
 
-  return await callInternalApi(MIKU_SYSTEM, [
+  const result = await callInternalApi(MIKU_SYSTEM, [
     ...conversationHistory,
     { role: 'user', content: userReply },
     { role: 'user', content: `(Context: ${prompt})` }
   ]);
+
+  return { ...result, options: generateFallbackOptions(result.message) };
 }
+
+export async function getMikuReply(
+  userReply: string,
+  history: { role: 'miku' | 'user'; text: string }[],
+  userId?: string
+): Promise<{ emotion: string; message: string; options?: string[] }> {
+  const msgResult = await getMikuReplyOnly(userReply, history, userId);
+  const options = await getMikuOptionsForMessage(msgResult.message);
+  return { ...msgResult, options };
+}
+
 
 export async function getMikuClosingMessage(
   lastReply: string,
