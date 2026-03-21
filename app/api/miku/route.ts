@@ -62,32 +62,52 @@ export async function POST(req: NextRequest) {
 
     console.log('[Miku API route] raw response:', JSON.stringify(raw));
 
-    // Parse [emotion] tag
+    // --- Parse Response (Fix 1) ---
+    const lines = raw.trim().split('\n');
+    
+    // Get emotion + message (everything before OPTIONS:)
+    const optionsLineIndex = lines.findIndex(l => l.toUpperCase().startsWith('OPTIONS:'));
+    
+    const messagePart = optionsLineIndex > -1
+      ? lines.slice(0, optionsLineIndex).join(' ').trim()
+      : raw;
+    
+    // Parse emotion
+    const match      = messagePart.match(/^\[(\w+)\]/i);
+    const rawEmotion = match?.[1]?.toLowerCase() ?? 'happy';
     const EMOTION_MAP: Record<string, string> = {
       happy: 'happy', sad: 'sad', angry: 'angry',
       excited: 'excited', love: 'love', thinking: 'thinking', blush: 'blush',
     };
-    const match      = raw.match(/^\[(\w+)\]/i);
-    const rawEmotion = match?.[1]?.toLowerCase() ?? 'happy';
-    const emotion    = EMOTION_MAP[rawEmotion] ?? 'happy';
+    const emotion = EMOTION_MAP[rawEmotion] ?? 'happy';
     
     // Truncate in code as backup (LEVEL 2)
     const truncateMessage = (text: string): string => {
       const words = text.split(' ');
       if(words.length <= 18) return text;
-      
-      // Cut at 18 words, end cleanly
       const cut = words.slice(0, 18).join(' ');
-      // Remove incomplete word at end
       const lastSpace = cut.lastIndexOf(' ');
       return (lastSpace > 0 ? cut.substring(0, lastSpace) : cut) + '...';
     };
 
     const message = truncateMessage(
-      raw.replace(/^\[\w+\]\s*\n?/i, '').trim()
+      messagePart.replace(/^\[\w+\]\s*\n?/i, '').trim()
     );
+    
+    // Parse options
+    let options = ['😊 Haan', '😅 Nahi', '🤔 Pata nahi'];
+    if(optionsLineIndex > -1) {
+      const optLine = lines[optionsLineIndex]
+        .replace(/OPTIONS:/i, '').trim();
+      const parsed = optLine
+        .match(/\[([^\]]+)\]/g)
+        ?.map(o => o.replace(/[\[\]]/g, '').trim());
+      if(parsed && parsed.length >= 1) {
+        options = parsed.slice(0, 3);
+      }
+    }
 
-    return NextResponse.json({ emotion, message });
+    return NextResponse.json({ emotion, message, options });
   } catch (err) {
     console.error('[Miku API route] fetch error:', err);
     return NextResponse.json({ error: 'Failed to reach NVIDIA API' }, { status: 502 });

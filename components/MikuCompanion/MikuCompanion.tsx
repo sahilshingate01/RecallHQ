@@ -108,6 +108,7 @@ export default function MikuCompanion() {
   const [mikuLoading,  setMikuLoading]  = useState(false);
   const [replyLoading, setReplyLoading] = useState(false);
   const [showReplyButtons, setShowReplyButtons] = useState(false);
+  const [replyOptions, setReplyOptions] = useState<string[]>([]);
   const maxExchangesRef = useRef(Math.floor(Math.random() * 3) + 2);
 
   const typewriterRef = useRef<NodeJS.Timeout | null>(null);
@@ -295,6 +296,7 @@ export default function MikuCompanion() {
       text: result.message,
       emotion: result.emotion as Emotion
     }]);
+    setReplyOptions(result.options || []);
     setCurrentMsg(result.message);
     setEmotion(result.emotion as Emotion);
     changeMikuExpression(result.emotion);
@@ -411,6 +413,7 @@ export default function MikuCompanion() {
         setEmotion(result.emotion as Emotion);
         changeMikuExpression(result.emotion);
         setConversation([{ role: 'miku', text: result.message, emotion: result.emotion as Emotion }]);
+        setReplyOptions(result.options || []);
         setCurrentMsg(result.message);
       }, 1500);
     }
@@ -549,8 +552,11 @@ export default function MikuCompanion() {
             setShowBubble(false);
 
             const result = await generateMikuMessage('sitting_on_card', el.dataset.taskName);
+            setMikuLoading(false);
             setEmotion(result.emotion as Emotion);
+            changeMikuExpression(result.emotion);
             setConversation([{ role: 'miku', text: result.message, emotion: result.emotion as Emotion }]);
+            setReplyOptions(result.options || []);
             setCurrentMsg(result.message);
             setShowBubble(true);
             setBubbleOpacity(1);
@@ -653,6 +659,7 @@ export default function MikuCompanion() {
     setEmotion(result.emotion as Emotion);
     changeMikuExpression(result.emotion);
     setConversation([{ role: 'miku', text: result.message, emotion: result.emotion as Emotion }]);
+    setReplyOptions(result.options || []);
     setCurrentMsg(result.message);
   };
 
@@ -732,20 +739,8 @@ export default function MikuCompanion() {
   /* ─────────────────────────────────────────
      REPLY OPTIONS
   ────────────────────────────────────────── */
-  const getReplyOptions = (history: ConversationMsg[]) => {
-    const mikuMsgs = history.filter(m => m.role === 'miku');
-    const lastMsg = mikuMsgs.at(-1)?.text || '';
-    if(lastMsg.includes('task') || lastMsg.includes('pending'))
-      return [{text:'😅 Haan kar dunga'}, {text:'🙄 Baad mein'}, {text:'😭 Busy tha yaar'}];
-    if(lastMsg.includes('DSA') || lastMsg.includes('leetcode'))
-      return [{text:'💪 Abhi karta hoon'}, {text:'😩 Kal se pakka'}, {text:'🤔 Ek toh karunga'}];
-    if(lastMsg.includes('so') || lastMsg.includes('raat'))
-      return [{text:'😴 Okay so raha hoon'}, {text:'😤 Ek aur ghanta'}, {text:'🥺 Tu bhi so ja'}];
-    if(lastMsg.includes('care') || lastMsg.includes('proud'))
-      return [{text:'🥺 Thanks Miku'}, {text:'😊 Perfect'}, {text:'💕 Main bhi!'}];
-    if(lastMsg.includes('Sunday') || lastMsg.includes('weekend'))
-      return [{text:'😤 Challenge accepted'}, {text:'😅 Try karunga'}, {text:'🤝 Deal hai'}];
-    return [{text:'😂 Haha okay'}, {text:'🙄 Miku please'}, {text:'🥺 Sorry yaar'}];
+  const getReplyOptions = () => {
+    return replyOptions.map(opt => ({ text: opt }));
   };
 
   /* ─────────────────────────────────────────
@@ -866,7 +861,7 @@ export default function MikuCompanion() {
           </div>
 
           {/* Reply buttons */}
-          {showReplyButtons && !convEnded && conversation.length > 0 && (
+          {showReplyButtons && !convEnded && replyOptions.length > 0 && (
             <div style={{ 
               display: 'flex', 
               flexWrap: 'wrap', 
@@ -878,8 +873,8 @@ export default function MikuCompanion() {
               transition: 'all 0.2s ease',
               marginTop: 8,
             }}>
-              {getReplyOptions(conversation).map((opt, i) => (
-                <button key={i} onClick={() => handleUserReply(opt.text)} disabled={replyLoading} style={{
+              {replyOptions.map((opt, i) => (
+                <button key={i} onClick={() => handleUserReply(opt)} disabled={replyLoading} style={{
                   background: i === 0 ? 'linear-gradient(135deg, #FDF2F8, #FAE8FF)' : 'rgba(255,255,255,0.9)',
                   border: i === 0 ? '1.5px solid #F9A8D4' : '1.5px solid #E5E7EB',
                   borderRadius: '30px', padding: '6px 14px', fontSize: '12px', cursor: 'pointer',
@@ -894,7 +889,7 @@ export default function MikuCompanion() {
                   if (replyLoading) return;
                   e.currentTarget.style.transform = 'scale(1)';
                   e.currentTarget.style.boxShadow = '0 2px 8px rgba(0,0,0,0.06)';
-                }}>{opt.text}</button>
+                }}>{opt}</button>
               ))}
             </div>
           )}
