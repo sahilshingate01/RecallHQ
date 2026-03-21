@@ -18,6 +18,7 @@ const navItems = [
   { id: "notes",     label: "Notes",     icon: FileText,        path: "/notes"     },
   { id: "cards",     label: "Cards",     icon: CreditCard,      path: "/cards"     },
   { id: "dsa",       label: "DSA",       icon: Code,            path: "/dsa"       },
+  { id: "fullstack", label: "Full Stack", icon: Code,            path: "/fullstack" },
 ];
 
 export default function Sidebar() {
