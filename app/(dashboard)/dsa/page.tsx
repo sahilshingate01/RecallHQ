@@ -6,12 +6,12 @@ import {
   CheckCircle2,
   Circle,
   Star,
-  FileText,
   ChevronDown,
   ChevronUp,
   LayoutTemplate
 } from "lucide-react";
 import { dsaData } from "@/lib/dsaData";
+import confetti from "canvas-confetti";
 
 // Calculate totals flatly
 const allProblems = dsaData.flatMap(s => s.lecs).flatMap(l => l.problems);
@@ -91,6 +91,14 @@ export default function DSAPage() {
     setCompleted(prev => ({ ...prev, [key]: newState }));
     if (newState) {
       localStorage.setItem(key, "true");
+      confetti({
+        particleCount: 150,
+        spread: 80,
+        origin: { y: 0.6 },
+        colors: ['#26ccff', '#a25afd', '#ff5e7e', '#88ff5a', '#fcff42', '#ffa62d', '#ff36ff'],
+        zIndex: 1000,
+        disableForReducedMotion: true
+      });
     } else {
       localStorage.removeItem(key);
     }
@@ -365,12 +373,6 @@ export default function DSAPage() {
                                               fill={isBookmarked ? "#f59e0b" : "transparent"} 
                                               onClick={() => toggleBookmark(bookKey)}
                                               style={{ cursor: "pointer", transition: "all 0.2s" }}
-                                            />
-                                            <FileText 
-                                              size={18} 
-                                              color="#94a3b8" 
-                                              style={{ cursor: "pointer" }}
-                                              onClick={() => alert(`Notes feature for ${prob.name} coming soon!`)}
                                             />
                                           </div>
                                         </div>
