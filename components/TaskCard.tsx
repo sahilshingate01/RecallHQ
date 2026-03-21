@@ -6,6 +6,7 @@ import { Task } from "@/types";
 import { useTaskStore } from "@/store/taskStore";
 import { useState, useEffect } from "react";
 import EditTaskModal from "./EditTaskModal";
+import confetti from "canvas-confetti";
 
 interface TaskCardProps {
   task: Task;
@@ -332,7 +333,21 @@ export default function TaskCard({ task }: TaskCardProps) {
             {/* --- DAILY TASK: "Done Today" toggle --- */}
             {isDaily ? (
               <motion.button
-                onClick={(e) => { e.stopPropagation(); toggleComplete(task.id, !task.completed); }}
+                onClick={(e) => { 
+                  e.stopPropagation(); 
+                  const newState = !task.completed;
+                  toggleComplete(task.id, newState);
+                  if (newState) {
+                    confetti({
+                      particleCount: 150,
+                      spread: 80,
+                      origin: { y: 0.6 },
+                      colors: ['#26ccff', '#a25afd', '#ff5e7e', '#88ff5a', '#fcff42', '#ffa62d', '#ff36ff'],
+                      zIndex: 1000,
+                      disableForReducedMotion: true
+                    });
+                  }
+                }}
                 whileTap={{ scale: 0.88 }}
                 title={isDoneToday ? "Mark as not done for today (move back to active)" : "Mark as done for today"}
                 style={{
@@ -384,7 +399,21 @@ export default function TaskCard({ task }: TaskCardProps) {
             ) : (
               /* --- ONE-TIME TASK: Restore/Toggle --- */
               <motion.button
-                onClick={(e) => { e.stopPropagation(); toggleComplete(task.id, !task.completed); }}
+                onClick={(e) => { 
+                  e.stopPropagation(); 
+                  const newState = !task.completed;
+                  toggleComplete(task.id, newState);
+                  if (newState) {
+                    confetti({
+                      particleCount: 150,
+                      spread: 80,
+                      origin: { y: 0.6 },
+                      colors: ['#26ccff', '#a25afd', '#ff5e7e', '#88ff5a', '#fcff42', '#ffa62d', '#ff36ff'],
+                      zIndex: 1000,
+                      disableForReducedMotion: true
+                    });
+                  }
+                }}
                 whileTap={{ scale: 0.88 }}
                 title={task.completed ? "Mark as incomplete (move back to active)" : "Mark as complete"}
                 style={{
