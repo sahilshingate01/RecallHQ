@@ -275,10 +275,14 @@ export default function MikuCompanion() {
     }
     setDisplayText('');
     setCurrentMsg('');
+    setShowBubble(false);
     setMikuLoading(true);
     
     // Small visual feedback — Miku "thinks"
-    await new Promise(r => setTimeout(r, 300));
+    await new Promise(r => setTimeout(r, 80));
+    setShowBubble(true);
+    setBubbleOpacity(1);
+
 
     const userRoleMsg: ConversationMsg = { role: 'user', text: replyText };
     const historySnapshot = [...conversation, userRoleMsg];
@@ -301,8 +305,7 @@ export default function MikuCompanion() {
     setCurrentMsg(result.message);
     setEmotion(result.emotion as Emotion);
     changeMikuExpression(result.emotion);
-    setShowBubble(true);
-    setBubbleOpacity(1);
+    // showBubble is already true (shows dots during fetch)
 
     // Update conversation state
     const mikuMsg: ConversationMsg = {
@@ -311,7 +314,6 @@ export default function MikuCompanion() {
       emotion: result.emotion as Emotion
     };
     setConversation(prev => [...prev, mikuMsg]);
-    setReplyOptions(result.options || []);
 
     // Background load options if not ended
     if (!convEnded && !(newCount >= maxExchangesRef.current)) {
@@ -321,8 +323,8 @@ export default function MikuCompanion() {
     } else {
       setReplyOptions([]);
     }
-
   };
+
 
   /* ─────────────────────────────────────────
      INIT MIKU (Fix 3 & 7)
@@ -409,23 +411,17 @@ export default function MikuCompanion() {
       
       // Talk after 1.5s
       setTimeout(async () => {
-        // Step 1: Stop typewriter
-        if(typewriterRef.current) {
-          clearInterval(typewriterRef.current);
-          typewriterRef.current = null;
-        }
-        
-        // Step 2: Clear everything BEFORE api call
+        // Step 2: Clear first
         setDisplayText('');
         setCurrentMsg('');
+        setShowBubble(false);
         setMikuLoading(true);
-        setShowBubble(true); // show bubble immediately with dots
+
+        await new Promise(r => setTimeout(r, 50));
+        setShowBubble(true); // Now safe, shows dots
         setBubbleOpacity(1);
         setIsTyping(false);
         setShowReplyButtons(false);
-        
-        // Step 3: Small pause
-        await new Promise(r => setTimeout(r, 80));
 
         const result = await getMikuMessageOnly('sitting_on_card', card.dataset.taskName);
         
@@ -440,6 +436,7 @@ export default function MikuCompanion() {
         getMikuOptionsForMessage(result.message).then(opts => {
           setReplyOptions(opts);
         });
+
 
       }, 1500);
     }
@@ -568,14 +565,17 @@ export default function MikuCompanion() {
           
           // Sit for 1s then talk
           setTimeout(async () => {
-            // Stop any current typewriter first
-            if(typewriterRef.current) {
-              clearInterval(typewriterRef.current);
-              typewriterRef.current = null;
-            }
+            // Clear first
             setDisplayText('');
-            setIsTyping(false);
+            setCurrentMsg('');
             setShowBubble(false);
+            setMikuLoading(true);
+
+            await new Promise(r => setTimeout(r, 50));
+            setShowBubble(true); // Now safe, shows dots
+            setBubbleOpacity(1);
+            setIsTyping(false);
+            setShowReplyButtons(false);
 
             const result = await getMikuMessageOnly('sitting_on_card', el.dataset.taskName);
             setMikuLoading(false);
@@ -583,14 +583,13 @@ export default function MikuCompanion() {
             changeMikuExpression(result.emotion);
             setConversation([{ role: 'miku', text: result.message, emotion: result.emotion as Emotion }]);
             setCurrentMsg(result.message);
-            setShowBubble(true);
-            setBubbleOpacity(1);
             setReplyOptions(result.options || []);
 
             // Background load BETTER options
             getMikuOptionsForMessage(result.message).then(opts => {
               setReplyOptions(opts);
             });
+
 
           }, 800);
         });
@@ -674,16 +673,16 @@ export default function MikuCompanion() {
     // Step 2: Clear EVERYTHING before API
     setDisplayText('');
     setCurrentMsg('');
+    setShowBubble(false);
     setMikuLoading(true);
-    setShowBubble(true); // show bubble immediately with dots
+
+    await new Promise(r => setTimeout(r, 50));
+    setShowBubble(true); // Now safe, shows dots
     setBubbleOpacity(1);
     setIsTyping(false);
     setShowReplyButtons(false);
     
     setState("talking");
-    
-    // Step 3: Small pause
-    await new Promise(r => setTimeout(r, 80));
 
     const result = await getMikuMessageOnly(type, tName);
     
@@ -698,6 +697,7 @@ export default function MikuCompanion() {
     getMikuOptionsForMessage(result.message).then(opts => {
       setReplyOptions(opts);
     });
+
 
   };
 
@@ -801,13 +801,10 @@ export default function MikuCompanion() {
         @keyframes dropBounce { 0%{transform:translateY(0)} 70%{transform:translateY(10px)} 85%{transform:translateY(-8px)} 100%{transform:translateY(0)} }
         @keyframes sitDown { 0%{transform:translateY(-20px);opacity:0} 60%{transform:translateY(4px)} 100%{transform:translateY(0);opacity:1} }
         @keyframes mikuBounce { 0%{transform:translateY(0)} 40%{transform:translateY(-25px)} 70%{transform:translateY(-10px)} 100%{transform:translateY(0)} }
-        @keyframes bubbleAppear { 0% { transform: translateY(10px) scale(0.92); opacity: 0; } 70% { transform: translateY(-3px) scale(1.02); } 100% { transform: translateY(0) scale(1); opacity: 1; } }
         @keyframes bubbleExit { 0% { transform: translateY(0); opacity: 1; } 100% { transform: translateY(-20px); opacity: 0; } }
-        .miku-bubble { animation: bubbleAppear 0.35s cubic-bezier(0.34,1.56,0.64,1) forwards; }
         .miku-bubble-exit { animation: bubbleExit 0.6s ease-in forwards; }
-        .typing-dot { width: 4px; height: 4px; background: #F472B6; borderRadius: 50%; animation: dotPulse 1.4s infinite; }
-        @keyframes dotPulse { 0%, 100% { opacity: 0.3; transform: scale(0.8); } 50% { opacity: 1; transform: scale(1.2); } }
       `}</style>
+
 
       {/* ANIME SPEECH BUBBLE */}
       {(conversation.length > 0 || showBubble) && (
@@ -827,65 +824,86 @@ export default function MikuCompanion() {
         }} className={convEnded ? "miku-bubble-exit" : "miku-bubble"}>
 
           <div style={{
-            background: 'rgba(255,255,255,0.97)',
-            backdropFilter: 'blur(8px)',
-            borderRadius: '20px',
-            boxShadow: '0 0 0 2px #F9A8D4, 0 12px 40px rgba(236,72,153,0.18), 0 4px 12px rgba(0,0,0,0.08)',
-            padding: '14px 18px',
-            maxWidth: '220px',    // ← smaller than before
-            maxHeight: '100px',   // ← hard limit
-            overflow: 'hidden',   // ← hide overflow
             position: 'relative',
+            display: 'inline-block',
             pointerEvents: 'auto',
           }}>
+            {/* Name pill - floats above, no background box */}
             <div style={{
-              position: 'absolute', top: -12, left: 16,
-              background: 'linear-gradient(135deg, #F472B6, #A78BFA)',
-              borderRadius: '20px', padding: '2px 10px', fontSize: '11px',
-              fontWeight: 700, color: 'white', letterSpacing: '0.3px',
-            }}>Miku ♡</div>
-
-            <div style={{
-              margin: 0, 
-              fontSize: '13px', 
-              lineHeight: 1.5, 
-              color: '#1f2937',
-              fontFamily: 'system-ui, -apple-system, sans-serif', 
-              fontWeight: 400,
-              wordWrap: 'break-word', 
-              overflowWrap: 'break-word', 
-              whiteSpace: 'normal',
-              display: '-webkit-box',
-              WebkitLineClamp: 3,      // max 3 lines
-              WebkitBoxOrient: 'vertical',
-              overflow: 'hidden',
+              position: 'absolute',
+              top: -10,
+              left: 12,
+              background: 'linear-gradient(135deg,#F472B6,#A78BFA)',
+              borderRadius: 20,
+              padding: '1px 8px',
+              fontSize: 10,
+              fontWeight: 700,
+              color: 'white',
+              zIndex: 1,
+              whiteSpace: 'nowrap',
             }}>
+              Miku ♡
+            </div>
+
+            {/* Bubble — pure white, no header */}
+            <div style={{
+              background: 'white',
+              borderRadius: '4px 20px 20px 20px',
+              border: '1.5px solid #F9A8D4',
+              padding: '14px 16px 10px 16px',
+              maxWidth: 220,
+              boxShadow: '0 4px 20px rgba(244,114,182,0.15)',
+              animation: 'bubbleFadeIn 0.25s ease forwards',
+              opacity: 0,
+            }}>
+              
+              {/* Loading state — dots only, no purple */}
               {mikuLoading ? (
-                <div style={{ display:'flex', gap:4, padding:'4px 0' }}>
-                  <div className="typing-dot"/>
-                  <div className="typing-dot" style={{animationDelay:'0.2s'}}/>
-                  <div className="typing-dot" style={{animationDelay:'0.4s'}}/>
+                <div style={{
+                  display: 'flex',
+                  gap: 5,
+                  padding: '4px 2px',
+                  alignItems: 'center',
+                }}>
+                  {[0,1,2].map(i => (
+                    <div key={i} style={{
+                      width: 7,
+                      height: 7,
+                      borderRadius: '50%',
+                      background: '#F9A8D4',
+                      animation: 'dotBounce 0.8s infinite',
+                      animationDelay: `${i * 0.15}s`,
+                    }}/>
+                  ))}
                 </div>
               ) : (
-                <>
+                <div style={{
+                  margin: 0, 
+                  fontSize: '13px', 
+                  lineHeight: 1.55, 
+                  color: '#1f2937',
+                  fontFamily: 'system-ui, -apple-system, sans-serif', 
+                  fontWeight: 400,
+                  wordWrap: 'break-word', 
+                  overflowWrap: 'break-word', 
+                  whiteSpace: 'normal',
+                }}>
                   {displayText}
                   {isTyping && (
                     <span style={{
                       display: 'inline-block', 
                       width: '1.5px', 
-                      height: '13px', 
+                      height: '12px', 
                       background: '#F472B6',
-                      marginLeft: '1px', 
+                      marginLeft: '2px', 
                       verticalAlign: 'middle',
-                      animation: 'none', // no animation, just solid
-                      opacity: 1,
                     }}/>
                   )}
-                </>
+                </div>
               )}
             </div>
 
-            {/* Tail (Moved outside the restricted p to prevent clipping) */}
+            {/* Tail */}
             <div style={{
               position: 'absolute', bottom: -12, left: 28, width: 0, height: 0,
               borderLeft: '10px solid transparent', borderRight: '6px solid transparent',
@@ -897,6 +915,7 @@ export default function MikuCompanion() {
               borderTop: '16px solid #F9A8D4', zIndex: -1,
             }}/>
           </div>
+
 
           {/* Reply buttons */}
           {showReplyButtons && !convEnded && replyOptions.length > 0 && (

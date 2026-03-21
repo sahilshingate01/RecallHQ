@@ -177,58 +177,87 @@ export async function getMikuMessageOnly(
 
 export async function getMikuOptionsForMessage(message: string): Promise<string[]> {
   const result = await callInternalApi(
-    `You generate short reply button options for a chat. Rules:
-- Exactly 3 options
-- Each option max 4 words
-- Must be direct replies to the message
-- Natural conversational Hindi/Hinglish
-- Output ONLY this format, nothing else:
-[option1] | [option2] | [option3]`,
-    `Miku said: "${message}"\nGenerate 3 reply options the user could say back. Output only: [opt1] | [opt2] | [opt3]`
+    `You make reply button options.
+Output ONLY 3 options in this exact format:
+[option1] | [option2] | [option3]
+Nothing else. No explanation. No extra text.`,
+    `Message: "${message}"
+
+Generate 3 funny natural replies in Hinglish.
+Be specific to what was asked.
+Examples for "Aaj ka dinner kaisa tha?":
+[Ghar ka tha acha] | [Bahar se mangaya] | [Kiya hi nahi 😭]
+
+Examples for "Kaam kitna ho gaya?":
+[Thoda hua] | [Bilkul nahi 😬] | [Done bhai done]
+
+Examples for "Class kesi gayi aaj?":
+[Mast thi yaar] | [Bunk kiya lol] | [Boring as usual]
+
+Now generate for: "${message}"
+Output only: [opt1] | [opt2] | [opt3]`
   );
 
   const raw = result.raw || '';
-  const optMatches = raw.match(/\[([^\]]+)\]/g);
+  let options: string[] = [];
   
-  if (optMatches && optMatches.length >= 3) {
-    return optMatches.slice(0, 3).map(o => o.replace(/[\[\]]/g, '').trim());
+  // Pattern 1: [opt1] | [opt2] | [opt3]
+  const pattern1 = raw.match(/\[([^\]]+)\]/g);
+  if(pattern1 && pattern1.length >= 3) {
+    options = pattern1.slice(0, 3).map(o => o.replace(/[\[\]]/g, '').trim());
+  }
+  // Pattern 2: opt1 | opt2 | opt3 (no brackets)
+  else if(raw.includes('|')) {
+    options = raw.split('|').slice(0, 3).map(o => o.trim()).filter(o => o.length > 0);
   }
 
-  return generateFallbackOptions(message);
+  if (options.length < 3) {
+    console.warn('[Miku] Options parse failed, using smart fallback');
+    return generateFallbackOptions(message);
+  }
+
+  return options;
 }
+
 
 // Smart fallback based on message content
 function generateFallbackOptions(message: string): string[] {
-  const msg = message.toLowerCase();
+  const m = message.toLowerCase();
   
-  if(msg.includes('class') || msg.includes('college'))
-    return ['Acha tha yaar', 'Boring tha', 'Bunk kiya 😅'];
+  if(m.includes('dinner') || m.includes('lunch') || 
+     m.includes('khana') || m.includes('kha'))
+    return ['Ghar ka tha', 'Bahar se liya', 'Kiya hi nahi 😭'];
   
-  if(msg.includes('kha') || msg.includes('lunch') || 
-     msg.includes('food'))
-    return ['Haan kha liya', 'Abhi nahi kiya', 'Kuch nahi mila'];
+  if(m.includes('class') || m.includes('college') || 
+     m.includes('lecture'))
+    return ['Mast thi yaar', 'Bunk kiya lol', 'Boring tha'];
   
-  if(msg.includes('so') || msg.includes('neend') ||
-     msg.includes('raat'))
+  if(m.includes('so') || m.includes('neend') || 
+     m.includes('raat') || m.includes('late'))
     return ['So raha hoon', 'Thoda aur jaag', '2 baje tak 😬'];
   
-  if(msg.includes('kaam') || msg.includes('task') ||
-     msg.includes('pending'))
-    return ['Kar dunga aaj', 'Kal pakka', 'Busy tha yaar'];
+  if(m.includes('kaam') || m.includes('task') || 
+     m.includes('project'))
+    return ['Kar raha hoon', 'Kal karunga', 'Busy tha yaar'];
   
-  if(msg.includes('dsa') || msg.includes('leetcode') ||
-     msg.includes('code'))
-    return ['Abhi karta hoon', 'Kal se start', 'Ek toh karunga'];
+  if(m.includes('dsa') || m.includes('code') || 
+     m.includes('leetcode'))
+    return ['Abhi karta hoon', 'Kal se pakka', 'Ek toh karunga'];
   
-  if(msg.includes('feel') || msg.includes('theek') ||
-     msg.includes('kesa'))
-    return ['Sab theek hai', 'Thak gaya hoon', 'Bas chal raha'];
+  if(m.includes('kaisa') || m.includes('theek') || 
+     m.includes('feel'))
+    return ['Sab badhiya hai', 'Thak gaya hoon', 'Bas chal raha'];
   
-  if(msg.includes('?')) // any question
-    return ['Haan bilkul', 'Nahi yaar', 'Pata nahi abhi'];
+  if(m.includes('movie') || m.includes('game') || 
+     m.includes('enjoy') || m.includes('fun'))
+    return ['Haan dekhi', 'Nahi yaar time nahi', 'Recommend kar'];
+  
+  if(m.includes('?'))
+    return ['Haan bilkul', 'Nahi hua yaar', 'Abhi soch raha'];
     
-  return ['Sahi bola', 'Hmm okay', 'Chal theek hai'];
+  return ['Sahi bola Miku', 'Hmm okay okay', 'Chal theek hai'];
 }
+
 
 export async function generateMikuMessage(
   triggerType: string,
