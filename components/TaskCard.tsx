@@ -67,6 +67,9 @@ export default function TaskCard({ task }: TaskCardProps) {
     <>
       <div
         ref={setNodeRef}
+        data-task-name={task.title}
+        data-task-date={task.created_at || ""}
+        data-task-id={task.id}
         style={{
           transform: CSS.Transform.toString(transform),
           transition: transition,
