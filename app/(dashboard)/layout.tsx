@@ -6,6 +6,7 @@ import TopBar from "@/components/TopBar";
 import FaceLogin from "@/components/FaceLogin";
 import FaceRegister from "@/components/FaceRegister";
 import AddTaskModal from "@/components/AddTaskModal";
+import ReminderNotifier from "@/components/ReminderNotifier";
 
 import { settingsService } from "@/lib/settingsService";
 
@@ -127,6 +128,7 @@ export default function DashboardLayout({
         isOpen={isAddModalOpen}
         onClose={() => setIsAddModalOpen(false)}
       />
+      <ReminderNotifier />
     </div>
   );
 }

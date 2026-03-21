@@ -108,3 +108,34 @@ textarea {
 ::selection {
   background: rgba(241, 90, 43, 0.2);
 }
+
+/* Toast Animations */
+@keyframes enter {
+  from {
+    transform: translateY(-20px) scale(0.9);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0) scale(1);
+    opacity: 1;
+  }
+}
+
+@keyframes leave {
+  from {
+    transform: translateY(0) scale(1);
+    opacity: 1;
+  }
+  to {
+    transform: translateY(-20px) scale(0.9);
+    opacity: 0;
+  }
+}
+
+.animate-enter {
+  animation: enter 0.3s cubic-bezier(0.2, 0.8, 0.2, 1) forwards;
+}
+
+.animate-leave {
+  animation: leave 0.2s cubic-bezier(0.2, 0.8, 0.2, 1) forwards;
+}
