@@ -38,7 +38,7 @@ export async function POST(req: NextRequest) {
         model: 'meta/llama-3.3-70b-instruct',
         temperature: 0.97,
         top_p: 0.95,
-        max_tokens: 80,
+        max_tokens: 45,
         presence_penalty: 0.9,
         frequency_penalty: 0.8,
         messages: [
@@ -70,7 +70,22 @@ export async function POST(req: NextRequest) {
     const match      = raw.match(/^\[(\w+)\]/i);
     const rawEmotion = match?.[1]?.toLowerCase() ?? 'happy';
     const emotion    = EMOTION_MAP[rawEmotion] ?? 'happy';
-    const message    = raw.replace(/^\[\w+\]\s*\n?/i, '').trim();
+    
+    // Truncate in code as backup (LEVEL 2)
+    const truncateMessage = (text: string): string => {
+      const words = text.split(' ');
+      if(words.length <= 18) return text;
+      
+      // Cut at 18 words, end cleanly
+      const cut = words.slice(0, 18).join(' ');
+      // Remove incomplete word at end
+      const lastSpace = cut.lastIndexOf(' ');
+      return (lastSpace > 0 ? cut.substring(0, lastSpace) : cut) + '...';
+    };
+
+    const message = truncateMessage(
+      raw.replace(/^\[\w+\]\s*\n?/i, '').trim()
+    );
 
     return NextResponse.json({ emotion, message });
   } catch (err) {

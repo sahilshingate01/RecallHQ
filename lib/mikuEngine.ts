@@ -87,7 +87,8 @@ export async function generateMikuMessage(
 This task has been pending ${ctx.oldestPendingDays} days. Total pending: ${ctx.pendingCount}
 
 She's sitting on it, staring at it. React to THIS specific task. Why hasn't he done it?
-Be dramatic, a bit personal. 1 line only.`;
+Be dramatic, a bit personal. 1 line only.
+STRICT RULE: Maximum 15 words total. One punchy sentence only. Cut everything else.`;
   } else {
     const situations: string[] = [];
     if (ctx.oldestPendingDays >= 5)
@@ -106,7 +107,8 @@ oldest pending: "${ctx.oldestPendingName}" (${ctx.oldestPendingDays} days old)
 dsa today: ${ctx.dsaToday} | week: ${ctx.dsaThisWeek}
 trigger type: ${triggerType}
 
-Pick ONE thing from the data and react to it naturally. 1-2 lines max.`;
+Pick ONE thing from the data and react to it naturally. 1-2 lines max.
+STRICT RULE: Maximum 15 words total. One punchy sentence only. Cut everything else.`;
   }
 
   const result = await callInternalApi(SYSTEM_PROMPT, situationPrompt);
@@ -139,7 +141,8 @@ DSA today: ${ctx.dsaToday}.
 Time is ${ctx.hourDisplay}.
 
 Reply naturally in Hinglish. Be yourself (tsundere, naughty best friend).
-Keep it short 1-2 lines.`;
+Keep it short 1-2 lines.
+STRICT RULE: Maximum 15 words total. One punchy sentence only. Cut everything else.`;
 
   return await callInternalApi(SYSTEM_PROMPT, [
     ...conversationHistory,
