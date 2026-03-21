@@ -4,6 +4,18 @@ import { useEffect, useState } from "react";
 import { ListTodo, CheckCircle2, Clock } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useTaskStore } from "@/store/taskStore";
+import {
+  DndContext,
+  closestCenter,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  DragEndEvent,
+} from '@dnd-kit/core';
+import {
+  SortableContext,
+  rectSortingStrategy,
+} from '@dnd-kit/sortable';
 import TaskCard from "@/components/TaskCard";
 import AddTaskModal from "@/components/AddTaskModal";
 import EmptyState from "@/components/EmptyState";
@@ -102,6 +114,21 @@ export default function TasksPage() {
     fetchTasks();
   }, [fetchTasks]);
 
+  const sensors = useSensors(
+    useSensor(PointerSensor, {
+      activationConstraint: {
+        distance: 5,
+      },
+    })
+  );
+
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
+    if (over && active.id !== over.id) {
+       useTaskStore.getState().reorderTasks(active.id as string, over.id as string);
+    }
+  };
+
   const todayStr = new Date().toISOString().split("T")[0];
   
   const priorityOrder = { high: 1, medium: 2, low: 3 };
@@ -114,6 +141,10 @@ export default function TasksPage() {
       return !t.completed;
     })
     .sort((a, b) => {
+      const posA = a.position ?? 0;
+      const posB = b.position ?? 0;
+      if (posA !== posB) return posA - posB;
+      
       const aOrder = priorityOrder[a.priority as keyof typeof priorityOrder] || 2;
       const bOrder = priorityOrder[b.priority as keyof typeof priorityOrder] || 2;
       if (aOrder !== bOrder) return aOrder - bOrder;
@@ -231,19 +262,30 @@ export default function TasksPage() {
                   Active Tasks
                   <span style={{ fontSize: 13, color: "#9aa5b4", fontWeight: 600 }}>({pendingTasks.length})</span>
                 </motion.h2>
-                <div
-                  style={{
-                    display: "grid",
-                    gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))",
-                    gap: 20,
-                  }}
+                <DndContext
+                  sensors={sensors}
+                  collisionDetection={closestCenter}
+                  onDragEnd={handleDragEnd}
                 >
-                  <AnimatePresence mode="popLayout">
-                    {pendingTasks.map((task) => (
-                      <TaskCard key={task.id} task={task} />
-                    ))}
-                  </AnimatePresence>
-                </div>
+                  <SortableContext
+                    items={pendingTasks.map((t) => t.id)}
+                    strategy={rectSortingStrategy}
+                  >
+                    <div
+                      style={{
+                        display: "grid",
+                        gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))",
+                        gap: 20,
+                      }}
+                    >
+                      <AnimatePresence mode="popLayout">
+                        {pendingTasks.map((task) => (
+                          <TaskCard key={task.id} task={task} />
+                        ))}
+                      </AnimatePresence>
+                    </div>
+                  </SortableContext>
+                </DndContext>
               </div>
             )}
 

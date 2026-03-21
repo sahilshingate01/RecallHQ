@@ -13,9 +13,22 @@ interface TaskStore {
   getTotalTasks: () => number;
   getCompletedToday: () => number;
   getPending: () => number;
+  reorderTasks: (activeId: string, overId: string) => Promise<void>;
 }
 
 const getTodayDateStr = () => new Date().toISOString().split("T")[0];
+
+const priorityOrder = { high: 1, medium: 2, low: 3 };
+const sortTasks = (a: Task, b: Task) => {
+  if (a.completed !== b.completed) return a.completed ? 1 : -1;
+  const posA = a.position ?? 0;
+  const posB = b.position ?? 0;
+  if (posA !== posB) return posA - posB;
+  const aOrder = priorityOrder[a.priority as keyof typeof priorityOrder] || 2;
+  const bOrder = priorityOrder[b.priority as keyof typeof priorityOrder] || 2;
+  if (aOrder !== bOrder) return aOrder - bOrder;
+  return new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime();
+};
 
 export const useTaskStore = create<TaskStore>((set, get) => ({
   tasks: [],
@@ -37,15 +50,7 @@ export const useTaskStore = create<TaskStore>((set, get) => ({
       });
 
       // Sort tasks: pending first, then by priority, then by date
-      const tasks = processedTasks.sort((a, b) => {
-        // First sort by completion status (optional, but keep it stable)
-        if (a.completed !== b.completed) return a.completed ? 1 : -1;
-        
-        const aOrder = priorityOrder[a.priority as keyof typeof priorityOrder] || 2;
-        const bOrder = priorityOrder[b.priority as keyof typeof priorityOrder] || 2;
-        if (aOrder !== bOrder) return aOrder - bOrder;
-        return new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime();
-      });
+      const tasks = processedTasks.sort(sortTasks);
 
       set({ tasks, loading: false });
 
@@ -68,13 +73,7 @@ export const useTaskStore = create<TaskStore>((set, get) => ({
       const priorityOrder = { high: 1, medium: 2, low: 3 };
       
       set((state) => ({ 
-        tasks: [newTask as Task, ...state.tasks].sort((a, b) => {
-          if (a.completed !== b.completed) return a.completed ? 1 : -1;
-          const aOrder = priorityOrder[a.priority as keyof typeof priorityOrder] || 2;
-          const bOrder = priorityOrder[b.priority as keyof typeof priorityOrder] || 2;
-          if (aOrder !== bOrder) return aOrder - bOrder;
-          return new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime();
-        })
+        tasks: [newTask as Task, ...state.tasks].sort(sortTasks)
       }));
     } catch (error) {
       console.error("Error adding task:", error);
@@ -86,13 +85,7 @@ export const useTaskStore = create<TaskStore>((set, get) => ({
       const priorityOrder = { high: 1, medium: 2, low: 3 };
       // Optimistic update
       set((state) => ({
-        tasks: state.tasks.map((t) => (t.id === id ? { ...t, ...updates } : t)).sort((a, b) => {
-          if (a.completed !== b.completed) return a.completed ? 1 : -1;
-          const aOrder = priorityOrder[a.priority as keyof typeof priorityOrder] || 2;
-          const bOrder = priorityOrder[b.priority as keyof typeof priorityOrder] || 2;
-          if (aOrder !== bOrder) return aOrder - bOrder;
-          return new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime();
-        }),
+        tasks: state.tasks.map((t) => (t.id === id ? { ...t, ...updates } : t)).sort(sortTasks),
       }));
       await taskService.updateTask(id, updates);
     } catch (error) {
@@ -109,13 +102,7 @@ export const useTaskStore = create<TaskStore>((set, get) => ({
       set((state) => ({
         tasks: state.tasks.map((t) => 
           t.id === id ? { ...t, completed, completed_at: completed ? new Date().toISOString() : undefined } : t
-        ).sort((a, b) => {
-          if (a.completed !== b.completed) return a.completed ? 1 : -1;
-          const aOrder = priorityOrder[a.priority as keyof typeof priorityOrder] || 2;
-          const bOrder = priorityOrder[b.priority as keyof typeof priorityOrder] || 2;
-          if (aOrder !== bOrder) return aOrder - bOrder;
-          return new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime();
-        })
+        ).sort(sortTasks)
       }));
     } catch (error) {
       console.error("Error toggling task:", error);
@@ -150,5 +137,40 @@ export const useTaskStore = create<TaskStore>((set, get) => ({
       }
       return !t.completed;
     }).length;
+  },
+
+  reorderTasks: async (activeId: string, overId: string) => {
+    const state = get();
+    const oldIndex = state.tasks.findIndex((t) => t.id === activeId);
+    const newIndex = state.tasks.findIndex((t) => t.id === overId);
+    
+    if (oldIndex === -1 || newIndex === -1) return;
+    
+    // Create a new array to work with
+    const newTasks = [...state.tasks];
+    const [movedTask] = newTasks.splice(oldIndex, 1);
+    newTasks.splice(newIndex, 0, movedTask);
+    
+    // Re-assign positions to all tasks (or just pending ones) to ensure consistency
+    // Assign position = index so lower index = lower position (appears first)
+    const updatedTasks = newTasks.map((t, index) => ({
+      ...t,
+      position: index
+    }));
+    
+    // Optimistic update
+    set({ tasks: updatedTasks });
+    
+    // Sync positions to DB for all tasks that changed pos
+    // Wait, updating ALL tasks might be expensive if there are many. Let's just update them.
+    try {
+      // In a real app we might bulk update. Here we can use Promise.all for simplicity
+      const updates = updatedTasks.map(t => taskService.updateTask(t.id, { position: t.position }));
+      await Promise.all(updates);
+    } catch (e) {
+      console.error("Failed to reorder tasks in DB", e);
+      // fallback
+      get().fetchTasks();
+    }
   },
 }));

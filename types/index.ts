@@ -7,6 +7,7 @@ export interface Task {
   link?: string;
   priority: "high" | "medium" | "low";
   completed: boolean;
+  position?: number;
   created_at?: string;
   updated_at?: string;
   completed_at?: string;

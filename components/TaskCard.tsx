@@ -1,12 +1,14 @@
 "use client";
 
 import { motion, AnimatePresence } from "framer-motion";
-import { Check, Trash2, Pencil, ExternalLink, RefreshCw, Minus, RotateCcw, Sun } from "lucide-react";
+import { Check, Trash2, Pencil, ExternalLink, RefreshCw, Minus, RotateCcw, Sun, GripHorizontal } from "lucide-react";
 import { Task } from "@/types";
 import { useTaskStore } from "@/store/taskStore";
 import { useState, useEffect } from "react";
 import EditTaskModal from "./EditTaskModal";
 import confetti from "canvas-confetti";
+import { useSortable } from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 
 interface TaskCardProps {
   task: Task;
@@ -52,48 +54,71 @@ export default function TaskCard({ task }: TaskCardProps) {
     }
   }, [task.updated_at, task.title, task.description, task.priority, task.link, task.type]);
 
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: task.id, disabled: task.completed && task.type !== "daily" });
+
   return (
     <>
-      <motion.div
-        layout
-        initial={{ opacity: 0, scale: 0.9, y: 20 }}
-        animate={{
-          opacity: 1,
-          scale: 1,
-          y: 0,
-          backgroundColor: isFlashing
-            ? "rgba(241, 90, 43, 0.12)"
-            : isDoneToday
-            ? "rgba(0, 184, 148, 0.04)"
-            : "var(--bg-card)",
-        }}
-        exit={{ opacity: 0, scale: 0.85, y: -10 }}
-        transition={{
-          type: "spring",
-          stiffness: 300,
-          damping: 28,
-          backgroundColor: { duration: 0.4 },
-        }}
-        whileHover={{ y: -4 }}
-        onHoverStart={() => setIsHovered(true)}
-        onHoverEnd={() => setIsHovered(false)}
+      <div
+        ref={setNodeRef}
         style={{
-          borderRadius: 24,
-          padding: "0",
-          boxShadow: isDoneToday
-            ? "inset 4px 4px 8px rgba(0,184,148,0.12), inset -4px -4px 8px rgba(255,255,255,0.8), 0 0 0 1.5px rgba(0,184,148,0.18)"
-            : task.completed
-            ? "inset 4px 4px 8px rgba(163,177,198,0.4), inset -4px -4px 8px rgba(255,255,255,0.7)"
-            : "8px 8px 18px rgba(163,177,198,0.55), -8px -8px 18px rgba(255,255,255,0.95)",
-          display: "flex",
-          flexDirection: "column",
-          cursor: "default",
+          transform: CSS.Transform.toString(transform),
+          transition: transition,
+          zIndex: isDragging ? 50 : "auto",
           position: "relative",
-          overflow: "hidden",
-          transition: "box-shadow 0.3s ease",
         }}
+        {...attributes}
+        {...listeners}
       >
-        {/* Daily "Done Today" status banner at top */}
+        <motion.div
+          layout
+          initial={{ opacity: 0, scale: 0.9, y: 20 }}
+          animate={{
+            opacity: 1,
+            scale: 1,
+            y: 0,
+            backgroundColor: isFlashing
+              ? "rgba(241, 90, 43, 0.12)"
+              : isDoneToday
+              ? "rgba(0, 184, 148, 0.04)"
+              : "var(--bg-card)",
+          }}
+          exit={{ opacity: 0, scale: 0.85, y: -10 }}
+          transition={{
+            type: "spring",
+            stiffness: 300,
+            damping: 28,
+            backgroundColor: { duration: 0.4 },
+          }}
+          whileHover={{ y: -4 }}
+          onHoverStart={() => setIsHovered(true)}
+          onHoverEnd={() => setIsHovered(false)}
+          style={{
+            opacity: isDragging ? 0.6 : 1,
+            borderRadius: 24,
+            padding: "0",
+            boxShadow: isDoneToday
+              ? "inset 4px 4px 8px rgba(0,184,148,0.12), inset -4px -4px 8px rgba(255,255,255,0.8), 0 0 0 1.5px rgba(0,184,148,0.18)"
+              : isDragging
+              ? "12px 12px 24px rgba(163,177,198,0.4), -12px -12px 24px rgba(255,255,255,0.8)"
+              : task.completed
+              ? "inset 4px 4px 8px rgba(163,177,198,0.4), inset -4px -4px 8px rgba(255,255,255,0.7)"
+              : "8px 8px 18px rgba(163,177,198,0.55), -8px -8px 18px rgba(255,255,255,0.95)",
+            display: "flex",
+            flexDirection: "column",
+            cursor: isDragging ? "grabbing" : "grab",
+            position: "relative",
+            overflow: "hidden",
+            transition: "box-shadow 0.3s ease",
+          }}
+        >
+          {/* Daily "Done Today" status banner at top */}
         {isDaily && (
           <div
             style={{
@@ -153,6 +178,7 @@ export default function TaskCard({ task }: TaskCardProps) {
                   whileHover={{ scale: 1.1 }}
                   whileTap={{ scale: 0.9 }}
                   onClick={(e) => { e.stopPropagation(); setIsEditOpen(true); }}
+                  onPointerDown={(e) => e.stopPropagation()}
                   style={{
                     width: 34,
                     height: 34,
@@ -175,6 +201,7 @@ export default function TaskCard({ task }: TaskCardProps) {
                   whileHover={{ scale: 1.1, color: "#f15a2b" }}
                   whileTap={{ scale: 0.9 }}
                   onClick={(e) => { e.stopPropagation(); deleteTask(task.id); }}
+                  onPointerDown={(e) => e.stopPropagation()}
                   style={{
                     width: 34,
                     height: 34,
@@ -279,6 +306,7 @@ export default function TaskCard({ task }: TaskCardProps) {
                 href={task.link}
                 target="_blank"
                 rel="noopener noreferrer"
+                onPointerDown={(e) => e.stopPropagation()}
                 style={{
                   display: "inline-flex",
                   alignItems: "center",
@@ -330,7 +358,7 @@ export default function TaskCard({ task }: TaskCardProps) {
               {formatDate(task.created_at || new Date().toISOString())}
             </span>
 
-            {/* --- DAILY TASK: "Done Today" toggle --- */}
+             {/* --- DAILY TASK: "Done Today" toggle --- */}
             {isDaily ? (
               <motion.button
                 onClick={(e) => { 
@@ -348,6 +376,7 @@ export default function TaskCard({ task }: TaskCardProps) {
                     });
                   }
                 }}
+                onPointerDown={(e) => e.stopPropagation()}
                 whileTap={{ scale: 0.88 }}
                 title={isDoneToday ? "Mark as not done for today (move back to active)" : "Mark as done for today"}
                 style={{
@@ -414,6 +443,7 @@ export default function TaskCard({ task }: TaskCardProps) {
                     });
                   }
                 }}
+                onPointerDown={(e) => e.stopPropagation()}
                 whileTap={{ scale: 0.88 }}
                 title={task.completed ? "Mark as incomplete (move back to active)" : "Mark as complete"}
                 style={{
@@ -468,7 +498,8 @@ export default function TaskCard({ task }: TaskCardProps) {
             )}
           </div>
         </div>
-      </motion.div>
+        </motion.div>
+      </div>
 
       <EditTaskModal
         isOpen={isEditOpen}

@@ -17,6 +17,7 @@ CREATE TABLE public.tasks (
     link TEXT,
     priority TEXT CHECK (priority IN ('high', 'medium', 'low')) DEFAULT 'medium',
     completed BOOLEAN DEFAULT FALSE,
+    position INTEGER DEFAULT 0,
     created_at TIMESTAMPTZ DEFAULT NOW(),
     updated_at TIMESTAMPTZ DEFAULT NOW(),
     completed_at TIMESTAMPTZ

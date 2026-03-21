@@ -20,6 +20,7 @@ export const taskService = {
       .from('tasks')
       .insert([{
         ...task,
+        position: task.position ?? 0,
         user_id: FIXED_USER_ID
       }])
       .select()
