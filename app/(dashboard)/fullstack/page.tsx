@@ -208,9 +208,90 @@ export default function FullStackPage() {
     });
   }, []);
 
-  // Sync completion states with node data
+  const [isLocked, setIsLocked] = useState(true);
+
+  // Sync node data when 'completed' status changes, preserving existing positions
   useEffect(() => {
     if (!isMounted) return;
+
+    setNodes((nds) => {
+      return nds.map((node) => {
+        const nData = fullstackNodes.find(n => n.id === node.id);
+        if (!nData) return node;
+
+        const incomingEdges = fullstackEdges.filter(e => e.to === node.id);
+        const isNodeLocked = incomingEdges.length > 0 && incomingEdges.some(e => !completed[e.from]);
+
+        return {
+          ...node,
+          data: {
+            ...node.data,
+            isCompleted: !!completed[node.id],
+            isLocked: isNodeLocked,
+            onToggle: toggleComplete,
+            onShowDetails: (data: any) => setSelectedNode({ ...data, isLocked: isNodeLocked })
+          },
+        };
+      });
+    });
+
+    setEdges((eds) => {
+      return eds.map((edge) => {
+        const fromId = (edge as any).source;
+        const toId = (edge as any).target;
+        const isFromDone = !!completed[fromId];
+        const isToDone = !!completed[toId];
+        const isEdgeActive = isFromDone && isToDone;
+        const fromNode = fullstackNodes.find(n => n.id === fromId);
+        const edgeColor = isEdgeActive ? (categoryColors[fromNode?.category || ""] || "#EF5A2A") : "#cbd5e1";
+
+        return {
+          ...edge,
+          animated: !isEdgeActive,
+          style: { 
+            ...edge.style,
+            stroke: edgeColor,
+            strokeWidth: isEdgeActive ? 4 : 2,
+            opacity: isEdgeActive ? 1 : 0.6,
+          },
+          markerEnd: {
+            ...(edge.markerEnd as any),
+            color: edgeColor,
+          },
+        };
+      });
+    });
+  }, [completed, toggleComplete, setNodes, setEdges, isMounted]);
+
+  // Handle node drag stop to persist positions
+  const onNodeDragStop = useCallback((event: any, draggedNode: any) => {
+    setNodes((nds) => {
+      const positions = nds.reduce((acc: any, n) => {
+        acc[n.id] = n.position;
+        return acc;
+      }, {});
+      localStorage.setItem('fs_node_positions', JSON.stringify(positions));
+      return nds;
+    });
+  }, [setNodes]);
+
+  // Load localStorage on mount
+  useEffect(() => {
+    // 1. Load completion states
+    const initCompleted: Record<string, boolean> = {};
+    fullstackNodes.forEach(node => {
+      if (localStorage.getItem(`fs_complete_${node.id}`) === "true") {
+        initCompleted[node.id] = true;
+      }
+    });
+
+    // 2. Load lock state (defaults to true for safety/read-only view)
+    const savedLock = localStorage.getItem('fs_is_locked');
+    setIsLocked(savedLock === null ? true : savedLock === 'true');
+
+    // 3. Load / Initialize nodes with positions
+    const savedPositionsStr = localStorage.getItem('fs_node_positions');
+    const savedPositions = savedPositionsStr ? JSON.parse(savedPositionsStr) : {};
 
     const phaseXOffset = 300;
     const phaseCounts: Record<number, number> = {};
@@ -221,28 +302,28 @@ export default function FullStackPage() {
       phaseCounts[phase] = indexInPhase + 1;
       
       const incomingEdges = fullstackEdges.filter(e => e.to === n.id);
-      const isLocked = incomingEdges.length > 0 && incomingEdges.some(e => !completed[e.from]);
+      const isNodeLocked = incomingEdges.length > 0 && incomingEdges.some(e => !initCompleted[e.from]);
 
       return {
         id: n.id,
         type: 'roadmapNode',
-        position: { 
+        position: savedPositions[n.id] || { 
           x: (phase - 1) * phaseXOffset + 50, 
           y: 100 + (indexInPhase * 160) 
         },
         data: { 
           ...n, 
-          isCompleted: !!completed[n.id],
-          isLocked,
+          isCompleted: !!initCompleted[n.id],
+          isLocked: isNodeLocked,
           onToggle: toggleComplete,
-          onShowDetails: (data: any) => setSelectedNode({ ...data, isLocked })
+          onShowDetails: (data: any) => setSelectedNode({ ...data, isLocked: isNodeLocked })
         },
       };
     });
 
     const preparedEdges = fullstackEdges.map((e) => {
-      const isFromDone = !!completed[e.from];
-      const isToDone = !!completed[e.to];
+      const isFromDone = !!initCompleted[e.from];
+      const isToDone = !!initCompleted[e.to];
       const isEdgeActive = isFromDone && isToDone;
       const fromNode = fullstackNodes.find(n => n.id === e.from);
       const edgeColor = isEdgeActive ? (categoryColors[fromNode?.category || ""] || "#EF5A2A") : "#cbd5e1";
@@ -267,21 +348,19 @@ export default function FullStackPage() {
       };
     });
 
+    setCompleted(initCompleted);
     setNodes(preparedNodes);
     setEdges(preparedEdges);
-  }, [completed, toggleComplete, setNodes, setEdges, isMounted]);
-
-  // Load localStorage on mount
-  useEffect(() => {
-    const initCompleted: Record<string, boolean> = {};
-    fullstackNodes.forEach(node => {
-      if (localStorage.getItem(`fs_complete_${node.id}`) === "true") {
-        initCompleted[node.id] = true;
-      }
-    });
-    setCompleted(initCompleted);
     setIsMounted(true);
-  }, []);
+  }, [setNodes, setEdges, toggleComplete]);
+
+  const toggleInteractivity = () => {
+    setIsLocked(prev => {
+      const next = !prev;
+      localStorage.setItem('fs_is_locked', String(next));
+      return next;
+    });
+  };
 
   const completedCount = Object.values(completed).filter(Boolean).length;
   const totalCount = fullstackNodes.length;
@@ -393,7 +472,11 @@ export default function FullStackPage() {
           edges={edges}
           onNodesChange={onNodesChange}
           onEdgesChange={onEdgesChange}
+          onNodeDragStop={onNodeDragStop}
           nodeTypes={nodeTypes}
+          nodesDraggable={!isLocked}
+          nodesConnectable={!isLocked}
+          elementsSelectable={!isLocked}
           fitView
           fitViewOptions={{ padding: 0.2 }}
           minZoom={0.2}
@@ -402,12 +485,47 @@ export default function FullStackPage() {
           proOptions={{ hideAttribution: true }}
         >
           <Background color="#cbd5e1" gap={25} size={1.5} />
-          <Controls style={{ 
-            boxShadow: '4px 4px 10px rgba(163,177,198,0.4), -4px -4px 10px rgba(255,255,255,0.8)',
-            border: 'none',
-            borderRadius: '12px',
-            background: '#e8ecf4'
-          }} />
+          <Controls 
+            showInteractive={false}
+            style={{ 
+              boxShadow: '4px 4px 10px rgba(163,177,198,0.4), -4px -4px 10px rgba(255,255,255,0.8)',
+              border: 'none',
+              borderRadius: '12px',
+              background: '#e8ecf4'
+            }} 
+          />
+          
+          {/* Legend Area (Custom Interactivity Toggle included here) */}
+          <div style={{
+            position: 'absolute',
+            bottom: 110,
+            left: 15,
+            zIndex: 5,
+            display: 'flex',
+            flexDirection: 'column',
+            gap: 12
+          }}>
+            <button
+              onClick={toggleInteractivity}
+              title={isLocked ? "Unlock Interactivity" : "Lock Interactivity"}
+              style={{
+                width: 42,
+                height: 42,
+                borderRadius: 12,
+                background: '#e8ecf4',
+                border: 'none',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                boxShadow: '4px 4px 10px rgba(163,177,198,0.4), -4px -4px 10px rgba(255,255,255,0.8)',
+                cursor: 'pointer',
+                color: isLocked ? '#EF4444' : '#10B981',
+                transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)'
+              }}
+            >
+              <Lock size={20} strokeWidth={isLocked ? 3 : 2} />
+            </button>
+          </div>
         </ReactFlow>
 
         {/* Legend Card */}
