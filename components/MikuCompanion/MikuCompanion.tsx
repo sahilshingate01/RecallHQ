@@ -157,8 +157,7 @@ export default function MikuCompanion() {
       >
         <MikuAvatar
           emotion={emotion}
-          isSpinning={isSpinning}
-          isBouncing={isBouncing}
+          isAnimating={isSpinning || isBouncing}
         />
         {/* Muted indicator */}
         {isMuted && (

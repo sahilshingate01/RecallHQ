@@ -16,10 +16,12 @@ export type TriggerCategory =
 
 export interface MikuContext {
   pendingTasks: number;
-  dsaToday: number;
+  pendingTaskNames: string[];
+  dsaSolvedToday: number;
+  dsaTotalSolved: number;
+  currentPage: string;
   hour: number;
-  page: string;
-  lazyDays: number;
+  isWeekend: boolean;
 }
 
 const fallbackMessages: Record<TriggerCategory, string[]> = {
@@ -76,46 +78,81 @@ function parseMessage(raw: string): { emotion: MikuEmotion; text: string } {
   return { emotion, text };
 }
 
-async function fetchAIMessage(context: MikuContext): Promise<string | null> {
-  const apiKey = process.env.NEXT_PUBLIC_ANTHROPIC_API_KEY;
-  if (!apiKey) return null;
+const NVIDIA_KEY = process.env.NEXT_PUBLIC_NVIDIA_KEY;
+
+async function getMikuMessage(
+  context: MikuContext
+): Promise<{ emotion: MikuEmotion; message: string }> {
+  const {
+    pendingTasks,
+    pendingTaskNames,
+    dsaSolvedToday,
+    dsaTotalSolved,
+    currentPage,
+    hour,
+    isWeekend,
+  } = context;
+
+  const system = `You are Miku, a cute anime girl assistant 
+in a productivity app. Talk in Hinglish (Hindi+English mix). 
+Max 2-3 lines. Be funny, naughty, caring like a best friend.
+Roast lovingly when lazy. Motivate when productive.
+Occasionally tease about no GF but keep it wholesome.
+Always start with emotion tag: 
+[happy] [sad] [angry] [excited] [love] [thinking] [blush]
+Be SPECIFIC - mention real task names and numbers.
+NEVER sound like an AI, sound like a texting friend.`;
+
+  const user = `User data right now:
+- Pending tasks: ${pendingTasks}
+- Task names: ${pendingTaskNames?.slice(0, 3).join(", ")}
+- DSA solved today: ${dsaSolvedToday}  
+- DSA total: ${dsaTotalSolved}/455
+- On page: ${currentPage}
+- Time: ${hour}:00
+- Weekend: ${isWeekend}
+Give ONE message Miku should say. Start with [emotion].`;
+
+  if (!NVIDIA_KEY) {
+    return { emotion: "thinking", message: "Ek second... kuch sochna pad raha hai 🤔" };
+  }
 
   try {
-    const response = await fetch("https://api.anthropic.com/v1/messages", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "x-api-key": apiKey,
-        "anthropic-version": "2023-06-01",
-        "anthropic-dangerous-direct-browser-access": "true",
-      },
-      body: JSON.stringify({
-        model: "claude-sonnet-4-20250514",
-        max_tokens: 150,
-        messages: [
-          {
-            role: "user",
-            content: `You are Miku, a cute anime girl assistant in a productivity app. You talk like a caring but naughty best friend. Mix Hindi and English (Hinglish) naturally. Keep messages SHORT (2-3 lines max). Be funny, a little teasing, but also motivating. Never be rude.
+    const res = await fetch(
+      "https://integrate.api.nvidia.com/v1/chat/completions",
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${NVIDIA_KEY}`,
+        },
+        body: JSON.stringify({
+          model: "meta/llama-3.3-70b-instruct",
+          temperature: 0.92,
+          top_p: 0.95,
+          max_tokens: 100,
+          messages: [
+            { role: "system", content: system },
+            { role: "user", content: user },
+          ],
+        }),
+      }
+    );
 
-Current user context:
-- Pending tasks: ${context.pendingTasks}
-- DSA problems solved today: ${context.dsaToday}
-- Current time: ${context.hour}:00
-- Current page: ${context.page}
-- Days since last productive day: ${context.lazyDays}
+    const data = await res.json();
+    const raw = data.choices[0].message.content.trim();
+    const match = raw.match(/^\[(\w+)\]/);
 
-Generate ONE message for Miku to say right now.
-Include an emotion tag at start: [happy] [sad] [angry] [excited] [love] [thinking] [blush]
-Example: "[thinking] Bhai aaj DSA nahi kiya? Main disappointed hoon... par chal, ek problem toh kar de abhi! 🥺"`,
-          },
-        ],
-      }),
-    });
-    if (!response.ok) return null;
-    const data = await response.json();
-    return data?.content?.[0]?.text ?? null;
-  } catch {
-    return null;
+    return {
+      emotion: (match?.[1] ?? "happy") as MikuEmotion,
+      message: raw.replace(/^\[\w+\]\s*/, ""),
+    };
+  } catch (err) {
+    console.error("Miku API error:", err);
+    return {
+      emotion: "thinking" as MikuEmotion,
+      message: "Ek second... kuch sochna pad raha hai 🤔",
+    };
   }
 }
 
@@ -142,32 +179,51 @@ export function useMikuTrigger(currentPage: string) {
       setIsMuted(false);
 
       const hour = new Date().getHours();
+      const day = new Date().getDay();
+      const isWeekend = day === 0 || day === 6;
       const tasks = JSON.parse(localStorage.getItem("tasks") || "[]");
-      const pendingTasks = tasks.filter(
+      const pendingTasksList = tasks.filter(
         (t: { completed: boolean }) => !t.completed
-      ).length;
-      const dsaToday = Object.keys(localStorage).filter(
+      );
+      const pendingTasks = pendingTasksList.length;
+      const pendingTaskNames = pendingTasksList
+        .slice(0, 3)
+        .map((t: { title?: string; name?: string }) => t.title ?? t.name ?? "Task");
+      const dsaKeys = Object.keys(localStorage).filter(
         (k) =>
           k.startsWith("dsa_complete_") &&
           localStorage.getItem(k) === "true"
-      ).length;
+      );
+      const dsaSolvedToday = dsaKeys.length;
+      const dsaTotalSolved = parseInt(
+        localStorage.getItem("dsa_total_solved") || String(dsaKeys.length)
+      );
 
       const context: MikuContext = {
         pendingTasks,
-        dsaToday,
+        pendingTaskNames,
+        dsaSolvedToday,
+        dsaTotalSolved,
+        currentPage,
         hour,
-        page: currentPage,
-        lazyDays: 0,
+        isWeekend,
       };
 
-      // Try AI first, fallback to local bank
-      let rawMsg = await fetchAIMessage(context);
-      if (!rawMsg) {
-        let pool = fallbackMessages[category];
-        rawMsg = pickRandom(pool).replace("{n}", String(pendingTasks));
+      // Try NVIDIA API first, fallback to local bank
+      let newEmotion: MikuEmotion;
+      let text: string;
+      try {
+        const aiResult = await getMikuMessage(context);
+        newEmotion = aiResult.emotion;
+        text = aiResult.message;
+      } catch {
+        const pool = fallbackMessages[category];
+        const rawMsg = pickRandom(pool).replace("{n}", String(pendingTasks));
+        const parsed = parseMessage(rawMsg);
+        newEmotion = parsed.emotion;
+        text = parsed.text;
       }
 
-      const { emotion: newEmotion, text } = parseMessage(rawMsg);
       setEmotion(newEmotion);
       setMessage(text);
       setVisible(true);
