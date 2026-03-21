@@ -9,6 +9,7 @@ import AddTaskModal from "@/components/AddTaskModal";
 import ReminderNotifier from "@/components/ReminderNotifier";
 
 import { settingsService } from "@/lib/settingsService";
+import MikuCompanion from "@/components/MikuCompanion/MikuCompanion";
 
 export default function DashboardLayout({
   children,
@@ -129,6 +130,7 @@ export default function DashboardLayout({
         onClose={() => setIsAddModalOpen(false)}
       />
       <ReminderNotifier />
+      <MikuCompanion />
     </div>
   );
 }
