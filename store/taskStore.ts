@@ -26,13 +26,25 @@ export const useTaskStore = create<TaskStore>((set, get) => ({
     try {
       const rawTasks = await taskService.getTasks();
       const todayStr = getTodayDateStr();
+      const priorityOrder = { high: 1, medium: 2, low: 3 };
       
       // Reset daily tasks that were completed on previous days
-      const tasks = (rawTasks as Task[]).map(t => {
+      const processedTasks = (rawTasks as Task[]).map(t => {
         if (t.type === "daily" && t.completed && t.completed_at && !t.completed_at.startsWith(todayStr)) {
           return { ...t, completed: false, completed_at: undefined }; // Reset for UI
         }
         return t;
+      });
+
+      // Sort tasks: pending first, then by priority, then by date
+      const tasks = processedTasks.sort((a, b) => {
+        // First sort by completion status (optional, but keep it stable)
+        if (a.completed !== b.completed) return a.completed ? 1 : -1;
+        
+        const aOrder = priorityOrder[a.priority as keyof typeof priorityOrder] || 2;
+        const bOrder = priorityOrder[b.priority as keyof typeof priorityOrder] || 2;
+        if (aOrder !== bOrder) return aOrder - bOrder;
+        return new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime();
       });
 
       set({ tasks, loading: false });
@@ -53,7 +65,17 @@ export const useTaskStore = create<TaskStore>((set, get) => ({
   addTask: async (taskData) => {
     try {
       const newTask = await taskService.addTask({ ...taskData, completed: false });
-      set((state) => ({ tasks: [newTask as Task, ...state.tasks] }));
+      const priorityOrder = { high: 1, medium: 2, low: 3 };
+      
+      set((state) => ({ 
+        tasks: [newTask as Task, ...state.tasks].sort((a, b) => {
+          if (a.completed !== b.completed) return a.completed ? 1 : -1;
+          const aOrder = priorityOrder[a.priority as keyof typeof priorityOrder] || 2;
+          const bOrder = priorityOrder[b.priority as keyof typeof priorityOrder] || 2;
+          if (aOrder !== bOrder) return aOrder - bOrder;
+          return new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime();
+        })
+      }));
     } catch (error) {
       console.error("Error adding task:", error);
     }
@@ -61,27 +83,39 @@ export const useTaskStore = create<TaskStore>((set, get) => ({
 
   updateTask: async (id, updates) => {
     try {
+      const priorityOrder = { high: 1, medium: 2, low: 3 };
       // Optimistic update
       set((state) => ({
-        tasks: state.tasks.map((t) => (t.id === id ? { ...t, ...updates } : t)),
+        tasks: state.tasks.map((t) => (t.id === id ? { ...t, ...updates } : t)).sort((a, b) => {
+          if (a.completed !== b.completed) return a.completed ? 1 : -1;
+          const aOrder = priorityOrder[a.priority as keyof typeof priorityOrder] || 2;
+          const bOrder = priorityOrder[b.priority as keyof typeof priorityOrder] || 2;
+          if (aOrder !== bOrder) return aOrder - bOrder;
+          return new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime();
+        }),
       }));
       await taskService.updateTask(id, updates);
     } catch (error) {
       console.error("Error updating task:", error);
       // Revert or refresh tasks on error
-      const tasks = await taskService.getTasks();
-      set({ tasks: tasks as Task[] });
+      get().fetchTasks(); 
     }
   },
-
 
   toggleComplete: async (id, completed) => {
     try {
       await taskService.toggleComplete(id, completed);
+      const priorityOrder = { high: 1, medium: 2, low: 3 };
       set((state) => ({
         tasks: state.tasks.map((t) => 
           t.id === id ? { ...t, completed, completed_at: completed ? new Date().toISOString() : undefined } : t
-        )
+        ).sort((a, b) => {
+          if (a.completed !== b.completed) return a.completed ? 1 : -1;
+          const aOrder = priorityOrder[a.priority as keyof typeof priorityOrder] || 2;
+          const bOrder = priorityOrder[b.priority as keyof typeof priorityOrder] || 2;
+          if (aOrder !== bOrder) return aOrder - bOrder;
+          return new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime();
+        })
       }));
     } catch (error) {
       console.error("Error toggling task:", error);

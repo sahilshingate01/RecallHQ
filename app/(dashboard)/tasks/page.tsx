@@ -104,19 +104,30 @@ export default function TasksPage() {
 
   const todayStr = new Date().toISOString().split("T")[0];
   
-  const pendingTasks = tasks.filter((t) => {
-    if (t.type === "daily") {
-      return !(t.completed && t.completed_at && t.completed_at.startsWith(todayStr));
-    }
-    return !t.completed;
-  });
+  const priorityOrder = { high: 1, medium: 2, low: 3 };
 
-  const completedTasks = tasks.filter((t) => {
-    if (t.type === "daily") {
-      return t.completed && t.completed_at && t.completed_at.startsWith(todayStr);
-    }
-    return t.completed;
-  });
+  const pendingTasks = tasks
+    .filter((t) => {
+      if (t.type === "daily") {
+        return !(t.completed && t.completed_at && t.completed_at.startsWith(todayStr));
+      }
+      return !t.completed;
+    })
+    .sort((a, b) => {
+      const aOrder = priorityOrder[a.priority as keyof typeof priorityOrder] || 2;
+      const bOrder = priorityOrder[b.priority as keyof typeof priorityOrder] || 2;
+      if (aOrder !== bOrder) return aOrder - bOrder;
+      return new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime();
+    });
+
+  const completedTasks = tasks
+    .filter((t) => {
+      if (t.type === "daily") {
+        return t.completed && t.completed_at && t.completed_at.startsWith(todayStr);
+      }
+      return t.completed;
+    })
+    .sort((a, b) => new Date(b.completed_at || 0).getTime() - new Date(a.completed_at || 0).getTime());
 
   return (
     <div style={{ height: "100%", display: "flex", flexDirection: "column", overflow: "hidden" }}>
