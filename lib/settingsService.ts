@@ -39,6 +39,6 @@ export const settingsService = {
 
   async verifyPin(pin: string) {
     // For now, hardcoded as per user request, but could be stored in DB
-    return pin === '8421'
+    return pin === '8275168236'
   }
 }

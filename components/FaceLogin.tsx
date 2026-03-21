@@ -150,7 +150,7 @@ export default function FaceLogin({ onSuccess }: FaceLoginProps) {
 
   const handlePinSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (pin === "8421") {
+    if (pin === "8275168236") {
       handleSuccess();
     } else {
       setPinError(true);
@@ -219,7 +219,7 @@ export default function FaceLogin({ onSuccess }: FaceLoginProps) {
               {showPinInput ? "PIN Unlock" : "Face Unlock"}
             </h1>
             <p style={{ fontFamily: "DM Sans", color: "#9aa5b4", fontSize: 16, marginTop: 8 }}>
-              {showPinInput ? "Enter your 4-digit security code" : "Look at the camera to unlock"}
+              {showPinInput ? "Enter your security code" : "Look at the camera to unlock"}
             </p>
           </div>
 
@@ -256,10 +256,10 @@ export default function FaceLogin({ onSuccess }: FaceLoginProps) {
                         <motion.input
                           animate={pinError ? { x: [-10, 10, -10, 10, 0] } : {}}
                           type="password"
-                          maxLength={4}
+                          maxLength={10}
                           value={pin}
                           onChange={(e) => setPin(e.target.value.replace(/\D/g, ""))}
-                          placeholder="••••"
+                          placeholder="••••••••••"
                           autoFocus
                           style={{
                             width: "100%",
