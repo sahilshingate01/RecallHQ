@@ -15,7 +15,7 @@ import ReactFlow, {
 } from 'reactflow';
 import 'reactflow/dist/style.css';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Code, CheckCircle2, Circle, Info, ExternalLink, X } from 'lucide-react';
+import { Code, CheckCircle2, Circle, Info, ExternalLink, X, Lock } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { fullstackNodes, fullstackEdges, FullstackNode } from '@/lib/fullstackData';
 
@@ -38,21 +38,23 @@ const difficultyStyles: Record<string, { bg: string, text: string }> = {
 };
 
 // --- Custom Node Component ---
-const RoadmapNode = ({ data }: NodeProps<FullstackNode & { isCompleted: boolean; onToggle: (id: string) => void; onShowDetails: (data: any) => void }>) => {
+const RoadmapNode = ({ data }: NodeProps<FullstackNode & { isCompleted: boolean; isLocked: boolean; onToggle: (id: string) => void; onShowDetails: (data: any) => void }>) => {
   return (
     <div 
       style={{
-        background: "#e8ecf4",
+        background: data.isCompleted ? "#f0f4f8" : "#e8ecf4",
+        opacity: data.isLocked ? 0.6 : 1,
         borderRadius: 16,
         padding: "14px 18px",
         minWidth: 200,
         boxShadow: data.isCompleted 
           ? "inset 4px 4px 8px rgba(163,177,198,0.4), inset -4px -4px 8px rgba(255,255,255,0.8)" 
           : "6px 6px 14px rgba(163,177,198,0.5), -6px -6px 14px rgba(255,255,255,0.9)",
-        borderLeft: `6px solid ${categoryColors[data.category] || "#cbd5e1"}`,
+        borderLeft: `6px solid ${data.isLocked ? "#94a3b8" : (categoryColors[data.category] || "#cbd5e1")}`,
         position: 'relative',
         cursor: 'default',
-        transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)'
+        transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+        filter: data.isLocked ? 'grayscale(0.5)' : 'none'
       }}
     >
       <Handle type="target" position={Position.Left} style={{ opacity: 0, width: 1, height: 1 }} />
@@ -62,10 +64,12 @@ const RoadmapNode = ({ data }: NodeProps<FullstackNode & { isCompleted: boolean;
           <div 
             onClick={(e) => {
               e.stopPropagation();
-              data.onToggle(data.id);
+              if (!data.isLocked) {
+                data.onToggle(data.id);
+              }
             }}
             style={{ 
-              cursor: "pointer", 
+              cursor: data.isLocked ? "not-allowed" : "pointer", 
               width: 24, 
               height: 24, 
               display: "flex", 
@@ -79,7 +83,10 @@ const RoadmapNode = ({ data }: NodeProps<FullstackNode & { isCompleted: boolean;
             {data.isCompleted ? 
               <CheckCircle2 size={20} color="#10b981" fill="#d1fae5" strokeWidth={2.5} /> 
               : 
-              <Circle size={20} color="#94a3b8" strokeWidth={2.5} />
+              data.isLocked ? 
+                <Lock size={16} color="#94a3b8" strokeWidth={2.5} />
+                :
+                <Circle size={20} color="#94a3b8" strokeWidth={2.5} />
             }
           </div>
           <div 
@@ -213,6 +220,9 @@ export default function FullStackPage() {
       const indexInPhase = phaseCounts[phase] || 0;
       phaseCounts[phase] = indexInPhase + 1;
       
+      const incomingEdges = fullstackEdges.filter(e => e.to === n.id);
+      const isLocked = incomingEdges.length > 0 && incomingEdges.some(e => !completed[e.from]);
+
       return {
         id: n.id,
         type: 'roadmapNode',
@@ -223,8 +233,9 @@ export default function FullStackPage() {
         data: { 
           ...n, 
           isCompleted: !!completed[n.id],
+          isLocked,
           onToggle: toggleComplete,
-          onShowDetails: (data: any) => setSelectedNode(data)
+          onShowDetails: (data: any) => setSelectedNode({ ...data, isLocked })
         },
       };
     });
@@ -521,12 +532,12 @@ export default function FullStackPage() {
                     padding: '18px',
                     borderRadius: 20,
                     border: 'none',
-                    background: selectedNode.isCompleted ? 'rgba(16, 185, 129, 0.1)' : 'linear-gradient(135deg, #EF5A2A, #E14D24)',
-                    color: selectedNode.isCompleted ? '#10b981' : 'white',
+                    background: selectedNode.isLocked ? "rgba(163, 177, 198, 0.2)" : (selectedNode.isCompleted ? 'rgba(16, 185, 129, 0.1)' : 'linear-gradient(135deg, #EF5A2A, #E14D24)'),
+                    color: selectedNode.isLocked ? "#9aa5b4" : (selectedNode.isCompleted ? '#10b981' : 'white'),
                     fontWeight: 900,
                     fontSize: 17,
                     fontFamily: 'Nunito',
-                    cursor: 'pointer',
+                    cursor: selectedNode.isLocked ? 'not-allowed' : 'pointer',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
@@ -535,7 +546,11 @@ export default function FullStackPage() {
                     transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)'
                   }}
                 >
-                  {selectedNode.isCompleted ? (
+                  {selectedNode.isLocked ? (
+                    <>
+                      <Lock size={20} /> Prerequisites Required
+                    </>
+                  ) : selectedNode.isCompleted ? (
                     <>
                       <CheckCircle2 size={24} /> Mastery Achieved
                     </>
