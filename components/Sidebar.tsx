@@ -8,6 +8,7 @@ import {
   Bell,
   FileText,
   CreditCard,
+  Code,
 } from "lucide-react";
 
 const navItems = [
@@ -16,6 +17,7 @@ const navItems = [
   { id: "reminders", label: "Reminders", icon: Bell,            path: "/reminders" },
   { id: "notes",     label: "Notes",     icon: FileText,        path: "/notes"     },
   { id: "cards",     label: "Cards",     icon: CreditCard,      path: "/cards"     },
+  { id: "dsa",       label: "DSA",       icon: Code,            path: "/dsa"       },
 ];
 
 export default function Sidebar() {
