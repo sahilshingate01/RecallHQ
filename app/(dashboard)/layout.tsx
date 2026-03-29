@@ -22,6 +22,8 @@ export default function DashboardLayout({
   const [searchQuery, setSearchQuery] = useState("");
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
 
+  const [isMikuActive, setIsMikuActive] = useState(false);
+
   useEffect(() => {
     const checkRegistration = async () => {
       // Check local storage first
@@ -95,7 +97,7 @@ export default function DashboardLayout({
       }}
     >
       {/* Sidebar */}
-      <Sidebar />
+      <Sidebar onToggleMiku={() => setIsMikuActive(!isMikuActive)} isMikuActive={isMikuActive} />
 
       {/* Main content area */}
       <div
@@ -130,7 +132,7 @@ export default function DashboardLayout({
         onClose={() => setIsAddModalOpen(false)}
       />
       <ReminderNotifier />
-      <MikuCompanion />
+      {isMikuActive && <MikuCompanion />}
     </div>
   );
 }

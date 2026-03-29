@@ -21,7 +21,12 @@ const navItems = [
   { id: "fullstack", label: "Full Stack", icon: Code,            path: "/fullstack" },
 ];
 
-export default function Sidebar() {
+interface SidebarProps {
+  onToggleMiku?: () => void;
+  isMikuActive?: boolean;
+}
+
+export default function Sidebar({ onToggleMiku, isMikuActive }: SidebarProps = {}) {
   const router   = useRouter();
   const pathname = usePathname();
 
@@ -53,12 +58,33 @@ export default function Sidebar() {
       <div style={{ paddingLeft: 28, paddingRight: 24, marginBottom: 36 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 5 }}>
           {/* 4-square orange-red grid icon */}
-          <svg width="26" height="26" viewBox="0 0 22 22" fill="none">
-            <rect x="1"  y="1"  width="9" height="9" rx="2.5" fill="#f15a2b" />
-            <rect x="12" y="1"  width="9" height="9" rx="2.5" fill="#f15a2b" />
-            <rect x="1"  y="12" width="9" height="9" rx="2.5" fill="#f15a2b" />
-            <rect x="12" y="12" width="9" height="9" rx="2.5" fill="#f15a2b" />
-          </svg>
+          <div 
+            onClick={onToggleMiku}
+            style={{ 
+              cursor: "pointer", 
+              display: "flex", 
+              alignItems: "center", 
+              justifyContent: "center",
+              transition: "transform 0.2s ease"
+            }}
+            title={isMikuActive ? "Deactivate Miku" : "Activate Miku"}
+          >
+            <motion.svg 
+              width="26" 
+              height="26" 
+              viewBox="0 0 22 22" 
+              fill="none"
+              animate={{ 
+                rotate: isMikuActive ? 90 : 0,
+                scale: isMikuActive ? 1.1 : 1
+              }}
+            >
+              <rect x="1"  y="1"  width="9" height="9" rx="2.5" fill={isMikuActive ? "#39c5bb" : "#f15a2b"} />
+              <rect x="12" y="1"  width="9" height="9" rx="2.5" fill={isMikuActive ? "#39c5bb" : "#f15a2b"} />
+              <rect x="1"  y="12" width="9" height="9" rx="2.5" fill={isMikuActive ? "#39c5bb" : "#f15a2b"} />
+              <rect x="12" y="12" width="9" height="9" rx="2.5" fill={isMikuActive ? "#39c5bb" : "#f15a2b"} />
+            </motion.svg>
+          </div>
           <span
             style={{
               fontFamily: "Nunito, sans-serif",
