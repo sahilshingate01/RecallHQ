@@ -9,6 +9,7 @@ import {
   FileText,
   CreditCard,
   Code,
+  Edit3,
 } from "lucide-react";
 
 const navItems = [
@@ -16,6 +17,7 @@ const navItems = [
   { id: "tasks",     label: "Tasks",     icon: CheckSquare,     path: "/tasks"     },
   { id: "reminders", label: "Reminders", icon: Bell,            path: "/reminders" },
   { id: "notes",     label: "Notes",     icon: FileText,        path: "/notes"     },
+  { id: "notepad",   label: "Notepad",   icon: Edit3,           path: "/notepad"   },
   { id: "cards",     label: "Cards",     icon: CreditCard,      path: "/cards"     },
   { id: "dsa",       label: "DSA",       icon: Code,            path: "/dsa"       },
   { id: "fullstack", label: "Full Stack", icon: Code,            path: "/fullstack" },
