@@ -8,8 +8,8 @@ import { ClipboardList, CheckCircle2, Clock, Archive } from "lucide-react";
 import AnimatedNumber from "@/components/AnimatedNumber";
 
 // --- Shared animation constants ---
-const cardTransition = { type: "spring", stiffness: 300, damping: 25 };
-const staggerContainer = { animate: { transition: { staggerChildren: 0.1 } } };
+const cardTransition = { type: "spring", stiffness: 300, damping: 25 } as const;
+const staggerContainer = { animate: { transition: { staggerChildren: 0.1 } } } as const;
 
 /* ── Shared card shell ─────────────────────────────────── */
 function StatCard({
