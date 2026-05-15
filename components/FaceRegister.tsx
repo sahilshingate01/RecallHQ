@@ -19,22 +19,13 @@ export default function FaceRegister({ onComplete }: FaceRegisterProps) {
 
   const loadModels = async () => {
     try {
-      const faceapi = await import("face-api.js");
-      const MODEL_URL = "/models";
-      await Promise.all([
-        faceapi.nets.ssdMobilenetv1.loadFromUri(MODEL_URL),
-        faceapi.nets.faceLandmark68Net.loadFromUri(MODEL_URL),
-        faceapi.nets.faceRecognitionNet.loadFromUri(MODEL_URL),
-      ]);
+      const { loadFaceApiModels } = await import("@/lib/faceApiUtils");
+      await loadFaceApiModels();
       setModelsLoaded(true);
       setLoading(false);
     } catch (err) {
       console.error("Failed to load face-api models:", err);
-      if (err instanceof Error) {
-        setError(`Failed to initialize Face ID systems: ${err.message}`);
-      } else {
-        setError("Failed to initialize Face ID systems.");
-      }
+      setError("Failed to initialize Face ID systems.");
       setLoading(false);
     }
   };

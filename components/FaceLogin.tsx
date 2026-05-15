@@ -23,22 +23,13 @@ export default function FaceLogin({ onSuccess }: FaceLoginProps) {
 
   const loadModels = async () => {
     try {
-      const faceapi = await import("face-api.js");
-      const MODEL_URL = "/models";
-      await Promise.all([
-        faceapi.nets.ssdMobilenetv1.loadFromUri(MODEL_URL),
-        faceapi.nets.faceLandmark68Net.loadFromUri(MODEL_URL),
-        faceapi.nets.faceRecognitionNet.loadFromUri(MODEL_URL),
-      ]);
+      const { loadFaceApiModels } = await import("@/lib/faceApiUtils");
+      await loadFaceApiModels();
       setModelsLoaded(true);
       setLoading(false);
     } catch (err) {
       console.error("Failed to load face-api models:", err);
-      if (err instanceof Error) {
-         setError(`Face recognition system failed to load: ${err.message}`);
-      } else {
-         setError("Face recognition system failed to load.");
-      }
+      setError("Face recognition system failed to load.");
       setLoading(false);
     }
   };

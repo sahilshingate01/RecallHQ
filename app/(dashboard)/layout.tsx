@@ -3,13 +3,18 @@
 import { useEffect, useState } from "react";
 import Sidebar from "@/components/Sidebar";
 import TopBar from "@/components/TopBar";
-import FaceLogin from "@/components/FaceLogin";
-import FaceRegister from "@/components/FaceRegister";
+const FaceLogin = dynamic(() => import("@/components/FaceLogin"), { ssr: false });
+const FaceRegister = dynamic(() => import("@/components/FaceRegister"), { ssr: false });
 import AddTaskModal from "@/components/AddTaskModal";
 import ReminderNotifier from "@/components/ReminderNotifier";
 
+import dynamic from "next/dynamic";
 import { settingsService } from "@/lib/settingsService";
-import MikuCompanion from "@/components/MikuCompanion/MikuCompanion";
+
+const MikuCompanion = dynamic(() => import("@/components/MikuCompanion/MikuCompanion"), {
+  ssr: false,
+  loading: () => null,
+});
 
 export default function DashboardLayout({
   children,
@@ -25,6 +30,9 @@ export default function DashboardLayout({
   const [isMikuActive, setIsMikuActive] = useState(false);
 
   useEffect(() => {
+    // Start pre-loading face-api models immediately
+    import("@/lib/faceApiUtils").then(m => m.loadFaceApiModels());
+
     const checkRegistration = async () => {
       // Check local storage first
       const localRegistered = localStorage.getItem("recallhq_face_registered") === "true";
