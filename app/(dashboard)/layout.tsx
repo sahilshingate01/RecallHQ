@@ -1,17 +1,16 @@
 "use client";
 
+import dynamic from "next/dynamic";
 import { useEffect, useState } from "react";
 import Sidebar from "@/components/Sidebar";
 import TopBar from "@/components/TopBar";
-const FaceLogin = dynamic(() => import("@/components/FaceLogin"), { ssr: false });
-const FaceRegister = dynamic(() => import("@/components/FaceRegister"), { ssr: false });
 import AddTaskModal from "@/components/AddTaskModal";
 import ReminderNotifier from "@/components/ReminderNotifier";
 import PageTransition from "@/components/PageTransition";
-
-import dynamic from "next/dynamic";
 import { settingsService } from "@/lib/settingsService";
 
+const FaceLogin = dynamic(() => import("@/components/FaceLogin"), { ssr: false });
+const FaceRegister = dynamic(() => import("@/components/FaceRegister"), { ssr: false });
 const MikuCompanion = dynamic(() => import("@/components/MikuCompanion/MikuCompanion"), {
   ssr: false,
   loading: () => null,
@@ -123,7 +122,7 @@ export default function DashboardLayout({
           background: "radial-gradient(circle, rgba(79, 172, 254, 0.1) 0%, rgba(79, 172, 254, 0) 70%)",
           borderRadius: "50%",
           pointerEvents: "none",
-          zIndex: 0,
+          zIndex: -1,
           filter: "blur(60px)",
           transition: "transform 0.15s cubic-bezier(0.23, 1, 0.32, 1)",
           willChange: "transform",
@@ -142,6 +141,8 @@ export default function DashboardLayout({
           gap: 36,
           overflow: "hidden",
           minWidth: 0,
+          position: "relative",
+          zIndex: 1,
         }}
       >
         <TopBar
@@ -154,6 +155,9 @@ export default function DashboardLayout({
           style={{
             flex: 1,
             overflow: "auto",
+            minHeight: "100%",
+            display: "flex",
+            flexDirection: "column",
           }}
         >
           <PageTransition>

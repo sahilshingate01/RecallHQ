@@ -333,7 +333,7 @@ export default function CardsPage() {
             </p>
           </motion.div>
         ) : (
-          <motion.div layout style={{
+          <motion.div style={{
             display: "grid",
             gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))",
             gap: 20,
