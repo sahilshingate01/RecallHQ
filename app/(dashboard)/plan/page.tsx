@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { usePlanStore } from "@/store/planStore";
 import { planData, WeekPlan } from "@/lib/planData";
@@ -15,6 +15,61 @@ import {
   Flame
 } from "lucide-react";
 import { fadeIn, staggerContainer, cardShadowHover } from "@/lib/animations";
+import confetti from "canvas-confetti";
+
+/* ── Confetti Utilities ────────────────────────────────── */
+
+const triggerConfetti = (type: 'task' | 'day' | 'week') => {
+  if (type === 'task') {
+    confetti({
+      particleCount: 40,
+      spread: 50,
+      origin: { y: 0.8 },
+      colors: ['#f15a2b', '#ff7e5f', '#4facfe'],
+      ticks: 200,
+      gravity: 1.2,
+      scalar: 0.8
+    });
+  } else if (type === 'day') {
+    const count = 200;
+    const defaults = {
+      origin: { y: 0.7 },
+      colors: ['#00b894', '#55efc4', '#f15a2b']
+    };
+
+    function fire(particleRatio: number, opts: any) {
+      confetti({
+        ...defaults,
+        ...opts,
+        particleCount: Math.floor(count * particleRatio)
+      });
+    }
+
+    fire(0.25, { spread: 26, startVelocity: 55 });
+    fire(0.2, { spread: 60 });
+    fire(0.35, { spread: 100, decay: 0.91, scalar: 0.8 });
+    fire(0.1, { spread: 120, startVelocity: 25, decay: 0.92, scalar: 1.2 });
+    fire(0.1, { spread: 120, startVelocity: 45 });
+  } else if (type === 'week') {
+    const duration = 5 * 1000;
+    const animationEnd = Date.now() + duration;
+    const defaults = { startVelocity: 30, spread: 360, ticks: 60, zIndex: 0 };
+
+    const randomInRange = (min: number, max: number) => Math.random() * (max - min) + min;
+
+    const interval: any = setInterval(function() {
+      const timeLeft = animationEnd - Date.now();
+
+      if (timeLeft <= 0) {
+        return clearInterval(interval);
+      }
+
+      const particleCount = 50 * (timeLeft / duration);
+      confetti({ ...defaults, particleCount, origin: { x: randomInRange(0.1, 0.3), y: Math.random() - 0.2 } });
+      confetti({ ...defaults, particleCount, origin: { x: randomInRange(0.7, 0.9), y: Math.random() - 0.2 } });
+    }, 250);
+  }
+};
 
 /* ── Components ────────────────────────────────────────── */
 
@@ -34,7 +89,7 @@ function ProgressBar({ progress }: { progress: number }) {
         transition={{ duration: 0.8, ease: "easeOut" }}
         style={{ 
           height: "100%", 
-          background: "linear-gradient(90deg, #f15a2b, #ff7e5f)",
+          background: "linear-gradient(90deg, #4facfe, #00f2fe)",
           borderRadius: 10 
         }}
       />
@@ -49,7 +104,11 @@ function TaskItem({ taskId, text }: { taskId: string, text: string }) {
   return (
     <motion.div
       variants={fadeIn}
-      onClick={() => toggleTask(taskId)}
+      onClick={() => {
+        const wasCompleted = isCompleted;
+        toggleTask(taskId);
+        if (!wasCompleted) triggerConfetti('task');
+      }}
       style={{
         display: "flex",
         alignItems: "flex-start",
@@ -64,7 +123,7 @@ function TaskItem({ taskId, text }: { taskId: string, text: string }) {
     >
       <div style={{ marginTop: 2 }}>
         {isCompleted ? (
-          <CheckCircle2 size={18} color="#f15a2b" />
+          <CheckCircle2 size={18} color="#4facfe" />
         ) : (
           <Circle size={18} color="#9aa5b4" />
         )}
@@ -142,20 +201,27 @@ function TrackCard({ title, icon: Icon, trackData, color, activeDay }: {
       </p>
 
       <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-        {filteredTasks.length > 0 ? (
-          filteredTasks.map((task: any) => (
-            <TaskItem key={task.id} taskId={task.id} text={task.text} />
-          ))
-        ) : (
-          <p style={{ 
-            fontSize: 13, 
-            color: "#9aa5b4", 
-            fontStyle: "italic",
-            padding: "12px 16px" 
-          }}>
-            No specific tasks for Day {activeDay}
-          </p>
-        )}
+        <AnimatePresence mode="popLayout">
+          {filteredTasks.length > 0 ? (
+            filteredTasks.map((task: any) => (
+              <TaskItem key={task.id} taskId={task.id} text={task.text} />
+            ))
+          ) : (
+            <motion.p 
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              style={{ 
+                fontSize: 13, 
+                color: "#9aa5b4", 
+                fontStyle: "italic",
+                padding: "12px 16px" 
+              }}
+            >
+              No specific tasks for Day {activeDay}
+            </motion.p>
+          )}
+        </AnimatePresence>
       </div>
     </motion.div>
   );
@@ -186,13 +252,13 @@ function DayTracker({ week, activeDay, onSelectDay }: {
               padding: "10px 18px",
               borderRadius: 18,
               background: isActive 
-                ? "linear-gradient(135deg, #f15a2b, #ff7e5f)" 
+                ? "linear-gradient(135deg, #4facfe, #00f2fe)" 
                 : isCompleted 
                   ? "rgba(0, 184, 148, 0.15)" 
                   : "#e8ecf4",
               color: isActive ? "white" : isCompleted ? "#00b894" : "#9aa5b4",
               boxShadow: isActive
-                ? "4px 4px 12px rgba(241, 90, 43, 0.3)"
+                ? "4px 4px 12px rgba(79, 172, 254, 0.3)"
                 : isCompleted
                   ? "none"
                   : "4px 4px 10px rgba(163,177,198,0.4), -4px -4px 10px rgba(255,255,255,0.8)",
@@ -224,7 +290,9 @@ function DayTracker({ week, activeDay, onSelectDay }: {
             <div 
               onClick={(e) => {
                 e.stopPropagation();
+                const wasCompleted = isCompleted;
                 toggleDay(week, day);
+                if (!wasCompleted) triggerConfetti('day');
               }}
               style={{
                 position: "absolute",
@@ -257,24 +325,31 @@ export default function PlanPage() {
   const [activeDay, setActiveDay] = useState(1);
   const { completedTasks } = usePlanStore();
 
-  const currentWeekData = planData.find(w => w.week === activeWeek) || planData[0];
+  const currentWeekData = useMemo(() => 
+    planData.find(w => w.week === activeWeek) || planData[0], 
+    [activeWeek]
+  );
 
   // Calculate progress
-  const allTasks = planData.flatMap(w => [
-    ...w.tracks.DSA.tasks,
-    ...w.tracks.Development.tasks,
-    ...w.tracks.DevOps.tasks
-  ]);
-  const completedCount = allTasks.filter(t => completedTasks[t.id]).length;
-  const overallProgress = Math.round((completedCount / allTasks.length) * 100);
+  const { overallProgress, weekProgress } = useMemo(() => {
+    const allTasks = planData.flatMap(w => [
+      ...w.tracks.DSA.tasks,
+      ...w.tracks.Development.tasks,
+      ...w.tracks.DevOps.tasks
+    ]);
+    const completedCount = allTasks.filter(t => completedTasks[t.id]).length;
+    const overall = Math.round((completedCount / allTasks.length) * 100);
 
-  const weekTasks = [
-    ...currentWeekData.tracks.DSA.tasks,
-    ...currentWeekData.tracks.Development.tasks,
-    ...currentWeekData.tracks.DevOps.tasks
-  ];
-  const weekCompleted = weekTasks.filter(t => completedTasks[t.id]).length;
-  const weekProgress = Math.round((weekCompleted / weekTasks.length) * 100);
+    const weekTasks = [
+      ...currentWeekData.tracks.DSA.tasks,
+      ...currentWeekData.tracks.Development.tasks,
+      ...currentWeekData.tracks.DevOps.tasks
+    ];
+    const weekCompletedCount = weekTasks.filter(t => completedTasks[t.id]).length;
+    const week = Math.round((weekCompletedCount / weekTasks.length) * 100);
+
+    return { overallProgress: overall, weekProgress: week };
+  }, [completedTasks, currentWeekData]);
 
   return (
     <div style={{ paddingBottom: 60 }}>
@@ -294,9 +369,9 @@ export default function PlanPage() {
               margin: 0,
               display: "flex",
               alignItems: "center",
-              gap: 12
+               gap: 12
             }}>
-              8-Week Internship Prep <Flame color="#f15a2b" fill="#f15a2b" size={28} />
+              8-Week Internship Prep <Flame color="#4facfe" fill="#4facfe" size={28} />
             </h1>
             <p style={{
               fontFamily: "DM Sans, sans-serif",
@@ -313,7 +388,7 @@ export default function PlanPage() {
               <span style={{ fontFamily: "DM Sans, sans-serif", fontSize: 13, fontWeight: 700, color: "#1e2a3a" }}>
                 Overall Progress
               </span>
-              <span style={{ fontFamily: "Nunito, sans-serif", fontSize: 13, fontWeight: 900, color: "#f15a2b" }}>
+              <span style={{ fontFamily: "Nunito, sans-serif", fontSize: 13, fontWeight: 900, color: "#4facfe" }}>
                 {overallProgress}%
               </span>
             </div>
@@ -340,10 +415,10 @@ export default function PlanPage() {
                 padding: "12px 24px",
                 borderRadius: 16,
                 border: "none",
-                background: activeWeek === w.week ? "#f15a2b" : "#e8ecf4",
+                background: activeWeek === w.week ? "#4facfe" : "#e8ecf4",
                 color: activeWeek === w.week ? "white" : "#9aa5b4",
                 boxShadow: activeWeek === w.week 
-                  ? "4px 4px 12px rgba(241, 90, 43, 0.3)"
+                  ? "4px 4px 12px rgba(79, 172, 254, 0.3)"
                   : "4px 4px 10px rgba(163,177,198,0.4), -4px -4px 10px rgba(255,255,255,0.8)",
                 cursor: "pointer",
                 fontFamily: "DM Sans, sans-serif",
@@ -387,7 +462,7 @@ export default function PlanPage() {
             boxShadow: "inset 2px 2px 5px rgba(163,177,198,0.5), inset -2px -2px 5px rgba(255,255,255,0.8)",
             fontSize: 12,
             fontWeight: 700,
-            color: "#f15a2b",
+            color: "#4facfe",
             fontFamily: "DM Sans, sans-serif"
           }}>
             {weekProgress}% Tasks Complete
@@ -435,30 +510,108 @@ export default function PlanPage() {
         />
       </motion.div>
 
-      {/* Checkpoint Reward (Optional) */}
-      {weekProgress === 100 && (
-        <motion.div
-          initial={{ scale: 0.8, opacity: 0 }}
-          animate={{ scale: 1, opacity: 1 }}
-          style={{
-            marginTop: 40,
-            padding: 32,
-            borderRadius: 24,
-            background: "linear-gradient(135deg, #f15a2b 0%, #ff7e5f 100%)",
-            color: "white",
-            textAlign: "center",
-            boxShadow: "0 20px 40px rgba(241, 90, 43, 0.2)"
-          }}
-        >
-          <Trophy size={48} style={{ marginBottom: 16 }} />
-          <h3 style={{ fontFamily: "Nunito, sans-serif", fontSize: 24, fontWeight: 900, margin: 0 }}>
-            Week {activeWeek} Mastered!
-          </h3>
-          <p style={{ fontFamily: "DM Sans, sans-serif", fontSize: 16, opacity: 0.9, marginTop: 8 }}>
-            You're one step closer to your dream internship. Keep the momentum going! 🚀
-          </p>
-        </motion.div>
-      )}
+      {/* Checkpoint Reward */}
+      <AnimatePresence>
+        {weekProgress === 100 && (
+          <motion.div
+            initial={{ scale: 0.8, opacity: 0, y: 40 }}
+            animate={{ 
+              scale: 1, 
+              opacity: 1, 
+              y: 0,
+              transition: { type: "spring", stiffness: 260, damping: 20 } 
+            }}
+            onViewportEnter={() => triggerConfetti('week')}
+            exit={{ scale: 0.8, opacity: 0 }}
+            style={{
+              marginTop: 40,
+              padding: 40,
+              borderRadius: 32,
+              background: "linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)",
+              color: "white",
+              textAlign: "center",
+              boxShadow: "0 20px 40px rgba(79, 172, 254, 0.3)",
+              position: "relative",
+              overflow: "hidden"
+            }}
+          >
+            {/* Background pattern */}
+            <div style={{
+              position: "absolute",
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              opacity: 0.1,
+              background: "radial-gradient(circle at 20% 30%, white 0%, transparent 40%), radial-gradient(circle at 80% 70%, white 0%, transparent 40%)",
+              pointerEvents: "none"
+            }} />
+
+            <motion.div
+              animate={{ 
+                rotate: [0, -10, 10, -10, 0],
+                scale: [1, 1.1, 1]
+              }}
+              transition={{ 
+                duration: 2, 
+                repeat: Infinity,
+                repeatType: "reverse"
+              }}
+            >
+              <Trophy size={64} style={{ marginBottom: 16 }} />
+            </motion.div>
+            
+            <h3 style={{ 
+              fontFamily: "Nunito, sans-serif", 
+              fontSize: 28, 
+              fontWeight: 900, 
+              margin: 0,
+              letterSpacing: "-0.5px"
+            }}>
+              Week {activeWeek} Mastered!
+            </h3>
+            <p style={{ 
+              fontFamily: "DM Sans, sans-serif", 
+              fontSize: 18, 
+              opacity: 0.9, 
+              marginTop: 12,
+              maxWidth: 500,
+              marginLeft: "auto",
+              marginRight: "auto",
+              lineHeight: 1.6
+            }}>
+              Incredible work! You've conquered every task for this week. 
+              The momentum is real—keep pushing toward that internship! 🚀
+            </p>
+            
+            <motion.button
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+              onClick={() => {
+                if (activeWeek < 8) {
+                  setActiveWeek(activeWeek + 1);
+                  window.scrollTo({ top: 0, behavior: 'smooth' });
+                }
+              }}
+              style={{
+                marginTop: 24,
+                padding: "12px 32px",
+                borderRadius: 16,
+                border: "none",
+                background: "white",
+                color: "#4facfe",
+                fontFamily: "DM Sans, sans-serif",
+                fontWeight: 800,
+                fontSize: 16,
+                cursor: "pointer",
+                boxShadow: "0 10px 20px rgba(0,0,0,0.1)"
+              }}
+            >
+              Start Week {activeWeek + 1}
+            </motion.button>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
