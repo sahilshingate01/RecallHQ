@@ -35,7 +35,10 @@ export const useTaskStore = create<TaskStore>((set, get) => ({
   loading: false,
 
   fetchTasks: async () => {
-    set({ loading: true });
+    // Only show loading if we don't have tasks yet (initial load)
+    if (get().tasks.length === 0) {
+      set({ loading: true });
+    }
     try {
       const rawTasks = await taskService.getTasks();
       const todayStr = getTodayDateStr();

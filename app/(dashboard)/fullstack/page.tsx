@@ -16,7 +16,6 @@ import ReactFlow, {
 import 'reactflow/dist/style.css';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Code, CheckCircle2, Circle, Info, ExternalLink, X, Lock } from 'lucide-react';
-import confetti from 'canvas-confetti';
 import { fullstackNodes, fullstackEdges, FullstackNode } from '@/lib/fullstackData';
 
 // --- Styles ---
@@ -195,11 +194,13 @@ export default function FullStackPage() {
       const key = `fs_complete_${id}`;
       if (isNowDone) {
         localStorage.setItem(key, "true");
-        confetti({
-          particleCount: 150,
-          spread: 80,
-          origin: { y: 0.6 },
-          colors: ['#EF5A2A', '#3B82F6', '#10B981', '#8B5CF6', '#F59E0B']
+        import("canvas-confetti").then((confetti) => {
+          confetti.default({
+            particleCount: 150,
+            spread: 80,
+            origin: { y: 0.6 },
+            colors: ['#EF5A2A', '#3B82F6', '#10B981', '#8B5CF6', '#F59E0B']
+          });
         });
       } else {
         localStorage.removeItem(key);

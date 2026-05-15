@@ -5,6 +5,9 @@ const nextConfig: NextConfig = {
   images: {
     unoptimized: true,
   },
+  experimental: {
+    optimizePackageImports: ["lucide-react", "framer-motion", "reactflow"],
+  },
 };
 
 export default nextConfig;

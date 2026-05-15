@@ -11,7 +11,6 @@ import {
   LayoutTemplate
 } from "lucide-react";
 import { dsaData } from "@/lib/dsaData";
-import confetti from "canvas-confetti";
 
 // Calculate totals flatly
 const allProblems = dsaData.flatMap(s => s.lecs).flatMap(l => l.problems);
@@ -91,13 +90,15 @@ export default function DSAPage() {
     setCompleted(prev => ({ ...prev, [key]: newState }));
     if (newState) {
       localStorage.setItem(key, "true");
-      confetti({
-        particleCount: 150,
-        spread: 80,
-        origin: { y: 0.6 },
-        colors: ['#26ccff', '#a25afd', '#ff5e7e', '#88ff5a', '#fcff42', '#ffa62d', '#ff36ff'],
-        zIndex: 1000,
-        disableForReducedMotion: true
+      import("canvas-confetti").then((confetti) => {
+        confetti.default({
+          particleCount: 150,
+          spread: 80,
+          origin: { y: 0.6 },
+          colors: ['#26ccff', '#a25afd', '#ff5e7e', '#88ff5a', '#fcff42', '#ffa62d', '#ff36ff'],
+          zIndex: 1000,
+          disableForReducedMotion: true
+        });
       });
     } else {
       localStorage.removeItem(key);

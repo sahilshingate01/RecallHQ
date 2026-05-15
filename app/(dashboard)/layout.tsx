@@ -1,7 +1,7 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import { useEffect, useState } from "react";
+import { useState, useEffect, memo } from "react";
 import Sidebar from "@/components/Sidebar";
 import TopBar from "@/components/TopBar";
 import AddTaskModal from "@/components/AddTaskModal";
@@ -15,6 +15,10 @@ const MikuCompanion = dynamic(() => import("@/components/MikuCompanion/MikuCompa
   ssr: false,
   loading: () => null,
 });
+
+// Memoize static layout parts
+const MemoizedSidebar = memo(Sidebar);
+const MemoizedTopBar = memo(TopBar);
 
 export default function DashboardLayout({
   children,
@@ -129,7 +133,7 @@ export default function DashboardLayout({
         }}
       />
       {/* Sidebar */}
-      <Sidebar onToggleMiku={() => setIsMikuActive(!isMikuActive)} isMikuActive={isMikuActive} />
+      <MemoizedSidebar onToggleMiku={() => setIsMikuActive(!isMikuActive)} isMikuActive={isMikuActive} />
 
       {/* Main content area */}
       <div
@@ -145,7 +149,7 @@ export default function DashboardLayout({
           zIndex: 1,
         }}
       >
-        <TopBar
+        <MemoizedTopBar
           searchQuery={searchQuery}
           setSearchQuery={setSearchQuery}
           onAddTask={() => setIsAddModalOpen(true)}

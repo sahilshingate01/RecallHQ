@@ -1,11 +1,15 @@
 "use client";
 
-import { useEffect } from "react";
+import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
+import { useRouter } from "next/navigation";
 import { useTaskStore } from "@/store/taskStore";
 import { ClipboardList, CheckCircle2, Clock, Archive } from "lucide-react";
 import AnimatedNumber from "@/components/AnimatedNumber";
-import { useState } from "react";
+
+// --- Shared animation constants ---
+const cardTransition = { type: "spring", stiffness: 300, damping: 25 };
+const staggerContainer = { animate: { transition: { staggerChildren: 0.1 } } };
 
 /* ── Shared card shell ─────────────────────────────────── */
 function StatCard({
@@ -55,7 +59,7 @@ function StatCard({
       animate={{ 
         rotateX: rotate.x, 
         rotateY: rotate.y,
-        transition: { type: "spring", stiffness: 300, damping: 25 } 
+        transition: cardTransition 
       }}
       whileHover={{ 
         y: -10, 
@@ -131,6 +135,7 @@ function StatCard({
 
 /* ── Dashboard Page ────────────────────────────────────── */
 export default function Dashboard() {
+  const router = useRouter();
   const { fetchTasks, tasks, loading, getTotalTasks, getCompletedToday, getPending } =
     useTaskStore();
 
@@ -143,13 +148,7 @@ export default function Dashboard() {
 
       {/* ── Stats row ── */}
       <motion.div
-        variants={{
-          animate: {
-            transition: {
-              staggerChildren: 0.1
-            }
-          }
-        }}
+        variants={staggerContainer}
         initial="initial"
         animate="animate"
         style={{
@@ -266,7 +265,7 @@ export default function Dashboard() {
           >
             <p>You have {tasks.length} task{tasks.length !== 1 ? "s" : ""} in your list.</p>
             <button
-              onClick={() => (window.location.href = "/tasks")}
+              onClick={() => router.push("/tasks")}
               style={{
                 marginTop: 16,
                 padding: "10px 22px",

@@ -1,5 +1,6 @@
 "use client";
 
+import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { useRouter, usePathname } from "next/navigation";
 import {
@@ -31,6 +32,13 @@ interface SidebarProps {
 export default function Sidebar({ onToggleMiku, isMikuActive }: SidebarProps = {}) {
   const router   = useRouter();
   const pathname = usePathname();
+
+  useEffect(() => {
+    // Prefetch common pages for "local-like" speed
+    navItems.forEach(item => {
+      router.prefetch(item.path);
+    });
+  }, [router]);
 
   return (
     <motion.aside
