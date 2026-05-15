@@ -11,10 +11,12 @@ import {
   CreditCard,
   Code,
   Edit3,
+  Calendar,
 } from "lucide-react";
 
 const navItems = [
   { id: "dashboard", label: "Dashboard", icon: LayoutDashboard, path: "/dashboard" },
+  { id: "plan",      label: "8-Week Plan",icon: Calendar,        path: "/plan"      },
   { id: "tasks",     label: "Tasks",     icon: CheckSquare,     path: "/tasks"     },
   { id: "reminders", label: "Reminders", icon: Bell,            path: "/reminders" },
   { id: "notes",     label: "Notes",     icon: FileText,        path: "/notes"     },
