@@ -29,7 +29,7 @@ export const staggerContainer: Variants = {
 };
 
 export const hoverScale = {
-  whileHover: { scale: 1.02, transition: { duration: 0.2, ease: "easeOut" } },
+  whileHover: { scale: 1.02, transition: { duration: 0.2, ease: "easeOut" as any } },
   whileTap: { scale: 0.98 }
 };
 
@@ -37,7 +37,7 @@ export const cardShadowHover = {
   whileHover: {
     y: -4,
     boxShadow: "12px 12px 24px rgba(163,177,198,0.65), -12px -12px 24px rgba(255,255,255,0.95)",
-    transition: { duration: 0.3, ease: "easeOut" }
+    transition: { duration: 0.3, ease: "easeOut" as any }
   },
   whileTap: { scale: 0.99 }
 };

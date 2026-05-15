@@ -86,10 +86,10 @@ function ProgressBar({ progress }: { progress: number }) {
       <motion.div 
         initial={{ width: 0 }}
         animate={{ width: `${progress}%` }}
-        transition={{ duration: 0.8, ease: "easeOut" }}
+        transition={{ duration: 0.8, ease: "easeOut" as any }}
         style={{ 
           height: "100%", 
-          background: "linear-gradient(90deg, #4facfe, #00f2fe)",
+          background: "#4facfe",
           borderRadius: 10 
         }}
       />
@@ -252,7 +252,7 @@ function DayTracker({ week, activeDay, onSelectDay }: {
               padding: "10px 18px",
               borderRadius: 18,
               background: isActive 
-                ? "linear-gradient(135deg, #4facfe, #00f2fe)" 
+                ? "#4facfe" 
                 : isCompleted 
                   ? "rgba(0, 184, 148, 0.15)" 
                   : "#e8ecf4",
@@ -527,7 +527,7 @@ export default function PlanPage() {
               marginTop: 40,
               padding: 40,
               borderRadius: 32,
-              background: "linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)",
+              background: "#4facfe",
               color: "white",
               textAlign: "center",
               boxShadow: "0 20px 40px rgba(79, 172, 254, 0.3)",
