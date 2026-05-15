@@ -107,6 +107,15 @@ export default function TopBar({
               fontSize: 14,
               color: "#1e2a3a",
               outline: "none",
+              transition: "all 0.4s cubic-bezier(0.2, 0.8, 0.2, 1)",
+            }}
+            onFocus={(e) => {
+              e.currentTarget.style.width = "280px";
+              e.currentTarget.style.boxShadow = "inset 5px 5px 10px rgba(163,177,198,0.65), inset -5px -5px 10px rgba(255,255,255,1)";
+            }}
+            onBlur={(e) => {
+              e.currentTarget.style.width = "240px";
+              e.currentTarget.style.boxShadow = "inset 4px 4px 8px rgba(163,177,198,0.55), inset -4px -4px 8px rgba(255,255,255,0.85)";
             }}
           />
         </div>

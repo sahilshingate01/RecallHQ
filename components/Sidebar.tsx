@@ -127,7 +127,12 @@ export default function Sidebar({ onToggleMiku, isMikuActive }: SidebarProps = {
             <motion.button
               key={item.id}
               onClick={() => router.push(item.path)}
-              whileTap={{ scale: 0.97 }}
+              whileHover={{ 
+                x: 4,
+                backgroundColor: isActive ? "rgba(236,240,248,1)" : "rgba(236,240,248,0.4)",
+              }}
+              whileTap={{ scale: 0.98 }}
+              className="soft-transition"
               style={{
                 display: "flex",
                 alignItems: "center",
@@ -141,31 +146,27 @@ export default function Sidebar({ onToggleMiku, isMikuActive }: SidebarProps = {
                 fontWeight: isActive ? 700 : 500,
                 fontSize: 15,
                 color: isActive ? "#f15a2b" : "#636e72",
-                background: isActive
-                  ? "linear-gradient(135deg, #ecf0f8 0%, #e4e9f2 100%)"
-                  : "transparent",
-                boxShadow: isActive
-                  ? "5px 5px 12px rgba(163,177,198,0.5), -5px -5px 12px rgba(255,255,255,0.85)"
-                  : "none",
-                transition: "all 0.2s ease",
+                background: "transparent",
                 width: "100%",
                 textAlign: "left",
                 position: "relative",
-              }}
-              onMouseEnter={(e) => {
-                if (!isActive) {
-                  (e.currentTarget as HTMLElement).style.background =
-                    "rgba(236,240,248,0.5)";
-                  (e.currentTarget as HTMLElement).style.color = "#4a5568";
-                }
-              }}
-              onMouseLeave={(e) => {
-                if (!isActive) {
-                  (e.currentTarget as HTMLElement).style.background = "transparent";
-                  (e.currentTarget as HTMLElement).style.color = "#636e72";
-                }
+                zIndex: 1,
               }}
             >
+              {isActive && (
+                <motion.div
+                  layoutId="activeIndicator"
+                  style={{
+                    position: "absolute",
+                    inset: 0,
+                    background: "linear-gradient(135deg, #ecf0f8 0%, #e4e9f2 100%)",
+                    borderRadius: 14,
+                    boxShadow: "5px 5px 12px rgba(163,177,198,0.5), -5px -5px 12px rgba(255,255,255,0.85)",
+                    zIndex: -1,
+                  }}
+                  transition={{ type: "spring", stiffness: 350, damping: 30 }}
+                />
+              )}
               <Icon
                 size={20}
                 color={isActive ? "#f15a2b" : "#9aa5b4"}

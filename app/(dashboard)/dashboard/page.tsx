@@ -4,6 +4,8 @@ import { useEffect } from "react";
 import { motion } from "framer-motion";
 import { useTaskStore } from "@/store/taskStore";
 import { ClipboardList, CheckCircle2, Clock, Archive } from "lucide-react";
+import AnimatedNumber from "@/components/AnimatedNumber";
+import { useState } from "react";
 
 /* ── Shared card shell ─────────────────────────────────── */
 function StatCard({
@@ -25,12 +27,42 @@ function StatCard({
   value: number;
   valueColor: string;
 }) {
+  const [rotate, setRotate] = useState({ x: 0, y: 0 });
+
+  const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
+    const rect = e.currentTarget.getBoundingClientRect();
+    const x = (e.clientX - rect.left) / rect.width;
+    const y = (e.clientY - rect.top) / rect.height;
+    setRotate({ x: (y - 0.5) * 15, y: (x - 0.5) * -15 });
+  };
+
+  const handleMouseLeave = () => {
+    setRotate({ x: 0, y: 0 });
+  };
+
   return (
     <motion.div
-      initial={{ opacity: 0, y: 24 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ delay, duration: 0.45, ease: "easeOut" }}
-      whileHover={{ y: -4 }}
+      variants={{
+        initial: { opacity: 0, y: 20 },
+        animate: { 
+          opacity: 1, 
+          y: 0,
+          transition: { duration: 0.6, ease: [0.22, 1, 0.36, 1] }
+        }
+      }}
+      onMouseMove={handleMouseMove}
+      onMouseLeave={handleMouseLeave}
+      animate={{ 
+        rotateX: rotate.x, 
+        rotateY: rotate.y,
+        transition: { type: "spring", stiffness: 300, damping: 25 } 
+      }}
+      whileHover={{ 
+        y: -10, 
+        scale: 1.03,
+        boxShadow: "15px 15px 30px rgba(163,177,198,0.7), -15px -15px 30px rgba(255,255,255,0.95)"
+      }}
+      whileTap={{ scale: 0.98 }}
       style={{
         background: "#e8ecf4",
         borderRadius: 28,
@@ -41,7 +73,9 @@ function StatCard({
         boxShadow:
           "8px 8px 18px rgba(163,177,198,0.6), -8px -8px 18px rgba(255,255,255,0.95)",
         cursor: "default",
-        transition: "box-shadow 0.25s ease, transform 0.25s ease",
+        transition: "box-shadow 0.3s ease",
+        perspective: 1000,
+        transformStyle: "preserve-3d",
       }}
     >
       {/* Icon box */}
@@ -56,13 +90,14 @@ function StatCard({
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
+          transform: "translateZ(30px)", // Pop effect
         }}
       >
         <Icon size={28} color={iconColor} strokeWidth={2} />
       </div>
 
       {/* Text */}
-      <div>
+      <div style={{ transform: "translateZ(20px)" }}>
         <p
           style={{
             fontFamily: "DM Sans, sans-serif",
@@ -80,14 +115,14 @@ function StatCard({
         <p
           style={{
             fontFamily: "Nunito, sans-serif",
-            fontSize: 40,
+            fontSize: 42,
             fontWeight: 900,
             color: valueColor,
             margin: 0,
             lineHeight: 1,
           }}
         >
-          {value}
+          <AnimatedNumber value={value} />
         </p>
       </div>
     </motion.div>
@@ -107,7 +142,16 @@ export default function Dashboard() {
     <div style={{ paddingBottom: 40 }}>
 
       {/* ── Stats row ── */}
-      <div
+      <motion.div
+        variants={{
+          animate: {
+            transition: {
+              staggerChildren: 0.1
+            }
+          }
+        }}
+        initial="initial"
+        animate="animate"
         style={{
           display: "grid",
           gridTemplateColumns: "repeat(3, 1fr)",
@@ -148,7 +192,7 @@ export default function Dashboard() {
           iconShadow="inset 3px 3px 7px rgba(163,177,198,0.55), inset -3px -3px 7px rgba(255,255,255,0.85)"
           valueColor="#9aa5b4"
         />
-      </div>
+      </motion.div>
 
       {/* ── Empty state / task summary ── */}
       <div

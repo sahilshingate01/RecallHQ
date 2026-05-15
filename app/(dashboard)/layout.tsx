@@ -7,6 +7,7 @@ const FaceLogin = dynamic(() => import("@/components/FaceLogin"), { ssr: false }
 const FaceRegister = dynamic(() => import("@/components/FaceRegister"), { ssr: false });
 import AddTaskModal from "@/components/AddTaskModal";
 import ReminderNotifier from "@/components/ReminderNotifier";
+import PageTransition from "@/components/PageTransition";
 
 import dynamic from "next/dynamic";
 import { settingsService } from "@/lib/settingsService";
@@ -97,13 +98,37 @@ export default function DashboardLayout({
 
   return (
     <div
+      onMouseMove={(e) => {
+        const x = e.clientX;
+        const y = e.clientY;
+        const light = document.getElementById("bg-light");
+        if (light) {
+          light.style.transform = `translate(${x - 200}px, ${y - 200}px)`;
+        }
+      }}
       style={{
         display: "flex",
         height: "100vh",
         background: "#dde3ed",
         overflow: "hidden",
+        position: "relative",
       }}
     >
+      <div
+        id="bg-light"
+        style={{
+          position: "fixed",
+          width: 400,
+          height: 400,
+          background: "radial-gradient(circle, rgba(79, 172, 254, 0.1) 0%, rgba(79, 172, 254, 0) 70%)",
+          borderRadius: "50%",
+          pointerEvents: "none",
+          zIndex: 0,
+          filter: "blur(60px)",
+          transition: "transform 0.15s cubic-bezier(0.23, 1, 0.32, 1)",
+          willChange: "transform",
+        }}
+      />
       {/* Sidebar */}
       <Sidebar onToggleMiku={() => setIsMikuActive(!isMikuActive)} isMikuActive={isMikuActive} />
 
@@ -131,7 +156,9 @@ export default function DashboardLayout({
             overflow: "auto",
           }}
         >
-          {children}
+          <PageTransition>
+            {children}
+          </PageTransition>
         </main>
       </div>
 

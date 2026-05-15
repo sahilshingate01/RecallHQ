@@ -49,7 +49,7 @@ function ProgressBar({ current, total, color = "#f15a2b" }: { current: number, t
         <motion.div
           initial={{ width: 0 }}
           animate={{ width: `${percentage}%` }}
-          transition={{ duration: 0.8, ease: "easeOut" }}
+          transition={{ duration: 0.8, ease: [0.2, 0.8, 0.2, 1] }}
           style={{ height: "100%", background: color, borderRadius: 10 }}
         />
       </div>
@@ -309,14 +309,23 @@ export default function DSAPage() {
                                       const isBookmarked = bookmarked[bookKey];
                                       
                                       return (
-                                        <div key={pIdx} style={{
-                                          display: "flex", alignItems: "center", gap: 16,
-                                          padding: "14px 16px",
-                                          background: isDone ? "rgba(225,244,232,0.5)" : "#e8ecf4",
-                                          borderRadius: 12,
-                                          boxShadow: "2px 2px 6px rgba(163,177,198,0.3), -2px -2px 6px rgba(255,255,255,0.8)",
-                                          transition: "all 0.2s"
-                                        }}>
+                                        <motion.div 
+                                          key={pIdx} 
+                                          whileHover={{ 
+                                            x: 4, 
+                                            backgroundColor: isDone ? "rgba(225,244,232,0.7)" : "rgba(232,236,244,1)",
+                                            boxShadow: "4px 4px 10px rgba(163,177,198,0.4), -4px -4px 10px rgba(255,255,255,0.9)"
+                                          }}
+                                          whileTap={{ scale: 0.99 }}
+                                          className="soft-transition"
+                                          style={{
+                                            display: "flex", alignItems: "center", gap: 16,
+                                            padding: "14px 16px",
+                                            background: isDone ? "rgba(225,244,232,0.5)" : "#e8ecf4",
+                                            borderRadius: 12,
+                                            boxShadow: "2px 2px 6px rgba(163,177,198,0.3), -2px -2px 6px rgba(255,255,255,0.8)",
+                                          }}
+                                        >
                                           {/* Checkbox */}
                                           <div 
                                             onClick={() => toggleComplete(compKey)}
@@ -375,7 +384,7 @@ export default function DSAPage() {
                                               style={{ cursor: "pointer", transition: "all 0.2s" }}
                                             />
                                           </div>
-                                        </div>
+                                        </motion.div>
                                       );
                                     })}
                                   </div>

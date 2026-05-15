@@ -24,6 +24,7 @@ const inputStyle: React.CSSProperties = {
   fontSize: 15,
   color: "#1e2a3a",
   outline: "none",
+  transition: "all 0.4s cubic-bezier(0.2, 0.8, 0.2, 1)",
   resize: "none" as const,
 };
 
