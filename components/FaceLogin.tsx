@@ -15,20 +15,41 @@ export default function FaceLogin({ onSuccess }: FaceLoginProps) {
   const [error, setError] = useState<string | null>(null);
   const [modelsLoaded, setModelsLoaded] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
-  const [startTime, setStartTime] = useState(Date.now());
   const [isClosing, setIsClosing] = useState(false);
   const [showPinInput, setShowPinInput] = useState(false);
   const [pin, setPin] = useState("");
   const [pinError, setPinError] = useState(false);
 
+  // Use refs for values needed in callbacks to avoid stale closures
+  const startTimeRef = useRef(Date.now());
+  const isMountedRef = useRef(true);
+  const detectionTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const isDetectingRef = useRef(false);
+  const isSuccessRef = useRef(false);
+  const errorRef = useRef<string | null>(null);
+  const showPinInputRef = useRef(false);
+
+  // Keep refs in sync with state
+  useEffect(() => { errorRef.current = error; }, [error]);
+  useEffect(() => { showPinInputRef.current = showPinInput; }, [showPinInput]);
+
+  const clearDetectionTimer = () => {
+    if (detectionTimerRef.current) {
+      clearTimeout(detectionTimerRef.current);
+      detectionTimerRef.current = null;
+    }
+  };
+
   const loadModels = async () => {
     try {
       const { loadFaceApiModels } = await import("@/lib/faceApiUtils");
       await loadFaceApiModels();
+      if (!isMountedRef.current) return;
       setModelsLoaded(true);
       setLoading(false);
     } catch (err) {
       console.error("Failed to load face-api models:", err);
+      if (!isMountedRef.current) return;
       setError("Face recognition system failed to load.");
       setLoading(false);
     }
@@ -36,112 +57,194 @@ export default function FaceLogin({ onSuccess }: FaceLoginProps) {
 
   const startVideo = useCallback(async () => {
     if (!videoRef.current) return;
+    // Stop any existing stream first
+    if (videoRef.current.srcObject) {
+      const existing = videoRef.current.srcObject as MediaStream;
+      existing.getTracks().forEach(track => track.stop());
+      videoRef.current.srcObject = null;
+    }
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ 
-        video: { width: 640, height: 480, facingMode: "user" } 
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { width: 640, height: 480, facingMode: "user" },
       });
+      if (!isMountedRef.current) {
+        stream.getTracks().forEach(t => t.stop());
+        return;
+      }
       videoRef.current.srcObject = stream;
     } catch (err) {
       console.error("Camera access denied:", err);
-      setError("Please allow camera access to unlock.");
+      if (isMountedRef.current) {
+        setError("Please allow camera access to unlock.");
+      }
     }
   }, []);
 
-  const stopVideo = () => {
+  const stopVideo = useCallback(() => {
     if (videoRef.current && videoRef.current.srcObject) {
       const stream = videoRef.current.srcObject as MediaStream;
       stream.getTracks().forEach(track => track.stop());
+      videoRef.current.srcObject = null;
     }
-  };
-
-  useEffect(() => {
-    loadModels();
-    setStartTime(Date.now());
-    return () => stopVideo();
   }, []);
 
-  useEffect(() => {
-    if (modelsLoaded && !isSuccess && !showPinInput) {
-      startVideo();
-    }
-  }, [modelsLoaded, isSuccess, startVideo, showPinInput]);
+  // Core detection logic — no recursive setTimeout; called by the scheduler below
+  const runDetectionOnce = useCallback(async (): Promise<boolean> => {
+    if (!videoRef.current || !isMountedRef.current) return false;
 
-  const detectAndMatch = useCallback(async () => {
-    if (!videoRef.current || !modelsLoaded || isSuccess || error || showPinInput) return;
+    const video = videoRef.current;
+    // Wait for the video to be ready (readyState >= 2 = HAVE_CURRENT_DATA)
+    if (video.readyState < 2 || video.paused || video.videoWidth === 0) {
+      return false; // not ready yet, will retry
+    }
 
     try {
       const faceapi = await import("face-api.js");
       const detection = await faceapi
-        .detectSingleFace(videoRef.current)
+        .detectSingleFace(video)
         .withFaceLandmarks()
         .withFaceDescriptor();
 
-      if (detection) {
-        let storedDescriptorRaw = localStorage.getItem('recallhq_face_descriptor');
-        
-        // If not found locally, try fetching from Supabase (for "any device" support)
-        if (!storedDescriptorRaw) {
-          const settings = await settingsService.getSettings();
-          if (settings && settings.face_descriptor) {
-            storedDescriptorRaw = JSON.stringify(settings.face_descriptor);
-            localStorage.setItem('recallhq_face_descriptor', storedDescriptorRaw);
-            localStorage.setItem('recallhq_face_registered', 'true');
-          }
-        }
+      if (!detection) return false;
 
-        if (!storedDescriptorRaw) {
+      let storedDescriptorRaw = localStorage.getItem("recallhq_face_descriptor");
+
+      // If not found locally, try fetching from cloud
+      if (!storedDescriptorRaw) {
+        const settings = await settingsService.getSettings();
+        if (settings && settings.face_descriptor) {
+          storedDescriptorRaw = JSON.stringify(settings.face_descriptor);
+          localStorage.setItem("recallhq_face_descriptor", storedDescriptorRaw);
+          localStorage.setItem("recallhq_face_registered", "true");
+        }
+      }
+
+      if (!storedDescriptorRaw) {
+        if (isMountedRef.current) {
           setError("Face ID not registered on this device or cloud.");
-          return;
         }
-
-        const savedDescriptor = new Float32Array(JSON.parse(storedDescriptorRaw));
-        const liveDescriptor = detection.descriptor;
-        
-        const distance = faceapi.euclideanDistance(liveDescriptor, savedDescriptor);
-        
-        // Loosened threshold for mobile camera variants
-        if (distance < 0.6) {
-          handleSuccess();
-          return;
-        }
+        return true; // stop detection — permanent error
       }
 
-      if (Date.now() - startTime > 15000) {
-        setError("Having trouble recognizing you...");
-      } else {
-        setTimeout(detectAndMatch, 600);
+      const savedDescriptor = new Float32Array(JSON.parse(storedDescriptorRaw));
+      const liveDescriptor = detection.descriptor;
+      const distance = faceapi.euclideanDistance(liveDescriptor, savedDescriptor);
+
+      if (distance < 0.6) {
+        return true; // matched!
       }
 
+      return false; // no match yet
     } catch (err) {
       console.error("Detection error:", err);
+      return false;
     }
-  }, [modelsLoaded, isSuccess, startTime, onSuccess, error, showPinInput]);
+  }, []);
 
-  const handleSuccess = () => {
+  const handleSuccess = useCallback(() => {
+    if (isSuccessRef.current) return;
+    isSuccessRef.current = true;
+    isDetectingRef.current = false;
+    clearDetectionTimer();
     setIsSuccess(true);
     stopVideo();
     setTimeout(() => {
       setIsClosing(true);
       setTimeout(() => onSuccess(), 800);
     }, 1500);
+  }, [stopVideo, onSuccess]);
+
+  // Detection scheduler — a clean loop using timeouts managed by refs
+  const scheduleDetection = useCallback(() => {
+    clearDetectionTimer();
+    if (!isMountedRef.current || isSuccessRef.current || errorRef.current || showPinInputRef.current) return;
+    if (!isDetectingRef.current) return;
+
+    const INTERVAL = 600;
+    const TIMEOUT = 16000;
+
+    const tick = async () => {
+      if (!isMountedRef.current || isSuccessRef.current || errorRef.current || showPinInputRef.current) return;
+      if (!isDetectingRef.current) return;
+
+      const matched = await runDetectionOnce();
+
+      if (!isMountedRef.current) return;
+
+      if (matched) {
+        handleSuccess();
+        return;
+      }
+
+      // Check timeout
+      if (Date.now() - startTimeRef.current > TIMEOUT) {
+        if (isMountedRef.current && !isSuccessRef.current && !errorRef.current) {
+          setError("Having trouble recognizing you. Please try again or use PIN.");
+        }
+        isDetectingRef.current = false;
+        return;
+      }
+
+      // Schedule next tick
+      if (!isSuccessRef.current && !errorRef.current && !showPinInputRef.current) {
+        detectionTimerRef.current = setTimeout(tick, INTERVAL);
+      }
+    };
+
+    // Initial delay to let video stabilize
+    detectionTimerRef.current = setTimeout(tick, 800);
+  }, [runDetectionOnce, handleSuccess]);
+
+  const startDetection = useCallback(() => {
+    startTimeRef.current = Date.now();
+    isDetectingRef.current = true;
+    scheduleDetection();
+  }, [scheduleDetection]);
+
+  const stopDetection = () => {
+    isDetectingRef.current = false;
+    clearDetectionTimer();
   };
 
+  // Mount / unmount
   useEffect(() => {
-    if (modelsLoaded && !isSuccess && !error && !showPinInput) {
-      const timer = setTimeout(detectAndMatch, 1000);
-      return () => clearTimeout(timer);
-    }
-  }, [modelsLoaded, isSuccess, error, detectAndMatch, showPinInput]);
+    isMountedRef.current = true;
+    loadModels();
+    return () => {
+      isMountedRef.current = false;
+      stopDetection();
+      stopVideo();
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
-  const handleRetry = () => {
+  // Start video + detection once models are ready
+  useEffect(() => {
+    if (modelsLoaded && !isSuccess && !showPinInput) {
+      startVideo().then(() => {
+        if (isMountedRef.current && !isSuccess && !showPinInput) {
+          startDetection();
+        }
+      });
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [modelsLoaded]);
+
+  const handleRetry = useCallback(() => {
+    stopDetection();
     setError(null);
-    setStartTime(Date.now());
-    startVideo();
-  };
+    errorRef.current = null;
+    startVideo().then(() => {
+      if (isMountedRef.current) {
+        startDetection();
+      }
+    });
+  }, [startVideo, startDetection]);
 
   const handlePinSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (pin === "8275168236") {
+    const valid = await settingsService.verifyPin(pin);
+    if (valid) {
       handleSuccess();
     } else {
       setPinError(true);
@@ -150,9 +253,28 @@ export default function FaceLogin({ onSuccess }: FaceLoginProps) {
     }
   };
 
+  const handleSwitchToPin = useCallback(() => {
+    stopDetection();
+    stopVideo();
+    showPinInputRef.current = true;
+    setShowPinInput(true);
+    setPin("");
+  }, [stopVideo]);
+
+  const handleSwitchToFace = useCallback(() => {
+    setShowPinInput(false);
+    showPinInputRef.current = false;
+    setPin("");
+    startVideo().then(() => {
+      if (isMountedRef.current) {
+        startDetection();
+      }
+    });
+  }, [startVideo, startDetection]);
+
   if (loading) {
     return (
-      <div 
+      <div
         style={{
           position: "fixed",
           inset: 0,
@@ -185,7 +307,7 @@ export default function FaceLogin({ onSuccess }: FaceLoginProps) {
   return (
     <AnimatePresence mode="wait">
       {!isClosing && (
-        <motion.div 
+        <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0, scale: 0.95 }}
@@ -216,7 +338,7 @@ export default function FaceLogin({ onSuccess }: FaceLoginProps) {
 
           {/* Main Area */}
           <div style={{ position: "relative", marginTop: 40 }}>
-            <div 
+            <div
               style={{
                 width: 340,
                 height: 340,
@@ -229,7 +351,7 @@ export default function FaceLogin({ onSuccess }: FaceLoginProps) {
                 padding: 18,
               }}
             >
-              <div 
+              <div
                 style={{
                   width: "100%",
                   height: "100%",
@@ -261,7 +383,7 @@ export default function FaceLogin({ onSuccess }: FaceLoginProps) {
                             color: "#1e2a3a",
                             fontFamily: "Nunito",
                             letterSpacing: "0.2em",
-                            outline: "none"
+                            outline: "none",
                           }}
                         />
                         <button type="submit" style={{ display: "none" }}>Unlock</button>
@@ -270,6 +392,7 @@ export default function FaceLogin({ onSuccess }: FaceLoginProps) {
                     </div>
                   ) : (
                     <>
+                      {/* Video is always in DOM so it can be reused on switch back */}
                       <video
                         ref={videoRef}
                         autoPlay
@@ -321,7 +444,7 @@ export default function FaceLogin({ onSuccess }: FaceLoginProps) {
             </div>
 
             {!isSuccess && !error && !showPinInput && (
-               <motion.div 
+              <motion.div
                 animate={{ rotate: 360 }}
                 transition={{ repeat: Infinity, duration: 4, ease: "linear" }}
                 style={{
@@ -330,7 +453,7 @@ export default function FaceLogin({ onSuccess }: FaceLoginProps) {
                   borderRadius: "50%",
                   border: "2px dashed #f15a2b",
                   opacity: 0.4,
-                  pointerEvents: "none"
+                  pointerEvents: "none",
                 }}
               />
             )}
@@ -339,7 +462,7 @@ export default function FaceLogin({ onSuccess }: FaceLoginProps) {
           {/* Status/Actions */}
           <div style={{ marginTop: 48, display: "flex", flexDirection: "column", alignItems: "center" }}>
             {isSuccess ? (
-              <motion.span 
+              <motion.span
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
                 style={{ color: "#00b894", fontWeight: 900, fontSize: 22, fontFamily: "Nunito" }}
@@ -348,29 +471,30 @@ export default function FaceLogin({ onSuccess }: FaceLoginProps) {
               </motion.span>
             ) : showPinInput ? (
               <div style={{ display: "flex", gap: 16 }}>
-                 <motion.button
-                    whileHover={{ scale: 1.05 }}
-                    whileTap={{ scale: 0.95 }}
-                    onClick={() => { setShowPinInput(false); setPin(""); }}
-                    style={{
-                      padding: "16px 36px",
-                      background: "#e8ecf4",
-                      color: "#9aa5b4",
-                      borderRadius: 50,
-                      border: "none",
-                      fontWeight: 900,
-                      fontFamily: "Nunito",
-                      fontSize: 16,
-                      boxShadow: "5px 5px 15px rgba(163,177,198,0.5), -5px -5px 15px rgba(255,255,255,0.9)",
-                      cursor: "pointer",
-                    }}
-                  >
-                    Use Face ID
-                  </motion.button>
+                <motion.button
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
+                  onClick={handleSwitchToFace}
+                  style={{
+                    padding: "16px 36px",
+                    background: "#e8ecf4",
+                    color: "#9aa5b4",
+                    borderRadius: 50,
+                    border: "none",
+                    fontWeight: 900,
+                    fontFamily: "Nunito",
+                    fontSize: 16,
+                    boxShadow: "5px 5px 15px rgba(163,177,198,0.5), -5px -5px 15px rgba(255,255,255,0.9)",
+                    cursor: "pointer",
+                  }}
+                >
+                  Use Face ID
+                </motion.button>
               </div>
             ) : error ? (
               <motion.div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 32 }}>
-                <div style={{ padding: "12px 24px", borderRadius: 20, background: "rgba(241, 90, 43, 0.08)", color: "#f15a2b", fontWeight: 800 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "12px 24px", borderRadius: 20, background: "rgba(241, 90, 43, 0.08)", color: "#f15a2b", fontWeight: 800 }}>
+                  <AlertCircle size={16} strokeWidth={2.5} />
                   {error}
                 </div>
                 <div style={{ display: "flex", gap: 16 }}>
@@ -378,14 +502,16 @@ export default function FaceLogin({ onSuccess }: FaceLoginProps) {
                     whileHover={{ scale: 1.05 }}
                     whileTap={{ scale: 0.95 }}
                     onClick={handleRetry}
-                    style={{ padding: "16px 36px", background: "linear-gradient(135deg, #4facfe, #00c6ff)", color: "white", borderRadius: 50, border: "none", fontWeight: 900, cursor: "pointer", display: "flex", alignItems: "center", gap: 10 }}>
+                    style={{ padding: "16px 36px", background: "linear-gradient(135deg, #4facfe, #00c6ff)", color: "white", borderRadius: 50, border: "none", fontWeight: 900, cursor: "pointer", display: "flex", alignItems: "center", gap: 10 }}
+                  >
                     <RefreshCw size={20} strokeWidth={2.5} /> Retry
                   </motion.button>
                   <motion.button
                     whileHover={{ scale: 1.05 }}
                     whileTap={{ scale: 0.95 }}
-                    onClick={() => { setShowPinInput(true); stopVideo(); }}
-                    style={{ padding: "16px 36px", background: "#e8ecf4", color: "#9aa5b4", borderRadius: 50, border: "none", fontWeight: 900, cursor: "pointer", display: "flex", alignItems: "center", gap: 10 }}>
+                    onClick={handleSwitchToPin}
+                    style={{ padding: "16px 36px", background: "#e8ecf4", color: "#9aa5b4", borderRadius: 50, border: "none", fontWeight: 900, cursor: "pointer", display: "flex", alignItems: "center", gap: 10 }}
+                  >
                     <Key size={18} strokeWidth={2.5} /> Enter PIN
                   </motion.button>
                 </div>
@@ -398,8 +524,9 @@ export default function FaceLogin({ onSuccess }: FaceLoginProps) {
                 <motion.button
                   whileHover={{ scale: 1.05 }}
                   whileTap={{ scale: 0.95 }}
-                  onClick={() => { setShowPinInput(true); stopVideo(); }}
-                  style={{ background: "transparent", border: "none", color: "#9aa5b4", fontWeight: 700, cursor: "pointer", display: "flex", alignItems: "center", gap: 8 }}>
+                  onClick={handleSwitchToPin}
+                  style={{ background: "transparent", border: "none", color: "#9aa5b4", fontWeight: 700, cursor: "pointer", display: "flex", alignItems: "center", gap: 8 }}
+                >
                   <Key size={16} /> Use PIN instead
                 </motion.button>
               </div>

@@ -11,6 +11,7 @@ interface FaceRegisterProps {
 
 export default function FaceRegister({ onComplete }: FaceRegisterProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
+  const isMountedRef = useRef(true);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isCapturing, setIsCapturing] = useState(false);
@@ -21,10 +22,12 @@ export default function FaceRegister({ onComplete }: FaceRegisterProps) {
     try {
       const { loadFaceApiModels } = await import("@/lib/faceApiUtils");
       await loadFaceApiModels();
+      if (!isMountedRef.current) return;
       setModelsLoaded(true);
       setLoading(false);
     } catch (err) {
       console.error("Failed to load face-api models:", err);
+      if (!isMountedRef.current) return;
       setError("Failed to initialize Face ID systems.");
       setLoading(false);
     }
@@ -32,14 +35,26 @@ export default function FaceRegister({ onComplete }: FaceRegisterProps) {
 
   const startVideo = useCallback(async () => {
     if (!videoRef.current) return;
+    // Stop any existing stream before starting a new one
+    if (videoRef.current.srcObject) {
+      const existing = videoRef.current.srcObject as MediaStream;
+      existing.getTracks().forEach(track => track.stop());
+      videoRef.current.srcObject = null;
+    }
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ 
         video: { width: 640, height: 480, facingMode: "user" } 
       });
+      if (!isMountedRef.current) {
+        stream.getTracks().forEach(t => t.stop());
+        return;
+      }
       videoRef.current.srcObject = stream;
     } catch (err) {
       console.error("Camera access denied:", err);
-      setError("Please allow camera access to set up Face ID.");
+      if (isMountedRef.current) {
+        setError("Please allow camera access to set up Face ID.");
+      }
     }
   }, []);
 
@@ -51,8 +66,13 @@ export default function FaceRegister({ onComplete }: FaceRegisterProps) {
   };
 
   useEffect(() => {
+    isMountedRef.current = true;
     loadModels();
-    return () => stopVideo();
+    return () => {
+      isMountedRef.current = false;
+      stopVideo();
+    };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
@@ -63,6 +83,13 @@ export default function FaceRegister({ onComplete }: FaceRegisterProps) {
 
   const handleCapture = async () => {
     if (!videoRef.current || !modelsLoaded) return;
+
+    // Make sure the video stream is ready before attempting detection
+    const video = videoRef.current;
+    if (video.readyState < 2 || video.paused || video.videoWidth === 0) {
+      setError("Camera is not ready yet. Please wait a moment and try again.");
+      return;
+    }
     
     setIsCapturing(true);
     setError(null);
@@ -70,9 +97,11 @@ export default function FaceRegister({ onComplete }: FaceRegisterProps) {
     try {
       const faceapi = await import("face-api.js");
       const detections = await faceapi
-        .detectSingleFace(videoRef.current)
+        .detectSingleFace(video)
         .withFaceLandmarks()
         .withFaceDescriptor();
+
+      if (!isMountedRef.current) return;
 
       if (!detections) {
         setError("Face not detected. Look directly at the camera.");
@@ -88,19 +117,25 @@ export default function FaceRegister({ onComplete }: FaceRegisterProps) {
       
       // Sync to Database
       await settingsService.saveFaceDescriptor(descriptorArray);
+
+      if (!isMountedRef.current) return;
       
       setIsRegistered(true);
       stopVideo();
       
       setTimeout(() => {
-        onComplete();
+        if (isMountedRef.current) onComplete();
       }, 2000);
 
     } catch (err) {
       console.error("Registration error:", err);
-      setError("Registration error. Please try again.");
+      if (isMountedRef.current) {
+        setError("Registration error. Please try again.");
+      }
     } finally {
-      setIsCapturing(false);
+      if (isMountedRef.current) {
+        setIsCapturing(false);
+      }
     }
   };
 

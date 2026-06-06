@@ -17,7 +17,9 @@ export const loadFaceApiModels = async () => {
       ]);
       modelsLoaded = true;
     } catch (err) {
+      // Reset so caller can retry
       loadingPromise = null;
+      modelsLoaded = false;
       console.error("Failed to load face-api models:", err);
       throw err;
     }
