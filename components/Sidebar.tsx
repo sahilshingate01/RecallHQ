@@ -24,6 +24,7 @@ const navItems = [
   { id: "cards",     label: "Cards",     icon: CreditCard,      path: "/cards"     },
   { id: "dsa",       label: "DSA",       icon: Code,            path: "/dsa"       },
   { id: "fullstack", label: "Full Stack", icon: Code,            path: "/fullstack" },
+  { id: "article",   label: "Article",   icon: FileText,        path: "/article"   },
 ];
 
 interface SidebarProps {
